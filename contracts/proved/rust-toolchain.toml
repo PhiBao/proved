@@ -1,0 +1,15 @@
+# The published WASM hash is only reproducible if the compiler is pinned.
+#
+# `stellar contract build` embeds the rustc version in the binary, so "two clean
+# builds are byte-identical" holds within a toolchain and drifts the moment
+# nightly moves. Without this file the workflow installs whatever nightly is
+# newest, the rebuilt hash stops matching the one deployed on mainnet, and the
+# check that is supposed to prove the deployed contract is the tested contract
+# fails for a reason that has nothing to do with the contract.
+#
+# Verified against the build that produced 9186424a…be337f31, which is what
+# CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ runs on mainnet.
+[toolchain]
+channel = "nightly-2026-05-21"
+components = ["rust-src"]
+targets = ["wasm32v1-none"]

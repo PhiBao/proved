@@ -3,9 +3,9 @@
 # and get the same numbers we did.
 #
 # The reproducible-build job is the important one. It rebuilds the WASM from a
-# clean checkout and compares the hash to the one deployed on mainnet, so
-# "the tests pass" and "the deployed contract is the tested contract" stop being
-# separate claims a reader has to take on faith.
+# clean checkout and compares the hash to the one deployed on mainnet, so "the
+# tests pass" and "the deployed contract is the tested contract" stop being two
+# claims a reader has to take on faith.
 name: contract
 
 on:
@@ -19,48 +19,87 @@ permissions:
 jobs:
   contract:
     runs-on: ubuntu-latest
+
+    # Two installs, not one. The repository root and apps/web are separate pnpm
+    # projects with their own lockfiles, so a root install leaves apps/web with no
+    # node_modules and `pnpm --dir apps/web build` fails on a missing dependency
+    # rather than on anything wrong with the app.
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust with the wasm target
-        run: |
-          rustup toolchain install nightly --component rust-src --target wasm32v1-none
-          rustup default nightly
+      # pnpm must be installed BEFORE setup-node. `cache: pnpm` makes setup-node
+      # shell out to `pnpm store path` during setup, so with the order reversed it
+      # fails with "pnpm: command not found" before this workflow ever reaches a
+      # build step. Pinning the version also keeps the lockfile's format stable.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.1
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
 
-      - uses: pnpm/action-setup@v4
-
+      # The prebuilt CLI, not `cargo install`. Building stellar-cli from source
+      # takes several minutes and is the slowest thing in this workflow by a wide
+      # margin; the release binary is the same version and takes seconds.
+      # The release names the tarball with an embedded version, not the bare
+      # v28.1.0 the docs suggest: stellar-cli-28.1.0-x86_64-unknown-linux-gnu.tar.gz.
       - name: Install the Stellar CLI
         run: |
-          cargo install --locked stellar-cli --version 28.1.0
+          set -euo pipefail
+          url=https://github.com/stellar/stellar-cli/releases/download/v28.1.0/stellar-cli-28.1.0-x86_64-unknown-linux-gnu.tar.gz
+          curl -fsSL -o /tmp/stellar-cli.tar.gz "$url"
+          mkdir -p /tmp/stellar-cli && tar xzf /tmp/stellar-cli.tar.gz -C /tmp/stellar-cli
+          sudo install -m 0755 /tmp/stellar-cli/stellar /usr/local/bin/stellar
+          stellar --version
 
-      - run: pnpm install --frozen-lockfile
+      # The toolchain is pinned in contracts/proved/rust-toolchain.toml and picked
+      # up automatically on `cd contracts/proved`. It has to be a date rather than
+      # `nightly`, because the compiler version is embedded in the WASM: an
+      # unpinned nightly rebuilds to a different hash and the check below would
+      # fail for a reason unrelated to the contract.
+      - name: Install the pinned Rust toolchain
+        working-directory: contracts/proved
+        run: |
+          set -euo pipefail
+          rustup show active-toolchain
+          rustc --version
 
-      # Recorded from the live deployments. If the contract changes on purpose,
-      # these move in the same commit as the change.
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir apps/web install --frozen-lockfile
+
+      # NEXT_PUBLIC_* values are inlined at build time and fail silently when
+      # absent, so a build without them produces an app that serves 200 and shows
+      # nothing. sync-env derives them from deployments.json.
+      - name: Write app environment
+        run: |
+          pnpm run sync-env
+          test -f apps/web/.env.local || { echo "::error::sync-env wrote nothing"; exit 1; }
+
+      # Recorded from the live mainnet deployment. If the contract changes on
+      # purpose, this moves in the same commit as the change and the redeploy.
       - name: Assert the rebuilt WASM is the deployed WASM
+        working-directory: contracts/proved
         run: |
           set -euo pipefail
           expected=9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31
-          cd contracts/proved
           stellar contract build
           actual=$(sha256sum target/wasm32v1-none/release/proved.wasm | cut -d' ' -f1)
           echo "rebuilt $actual"
           echo "deployed $expected"
           if [ "$actual" != "$expected" ]; then
             echo "::error::The built contract is not the one deployed on mainnet."
-            echo "Either a change needs deploying, or the recorded hash is stale."
+            echo "Either a change needs deploying, or contracts/proved/rust-toolchain.toml has moved."
             exit 1
           fi
 
       - name: Build is reproducible
+        working-directory: contracts/proved
         run: |
           set -euo pipefail
-          cd contracts/proved
           cp target/wasm32v1-none/release/proved.wasm /tmp/first.wasm
           rm -rf target/wasm32v1-none
           stellar contract build
@@ -78,8 +117,8 @@ jobs:
       - name: Frontend builds
         run: pnpm run build:web
 
-      # The whole app is one `pnpm check` for anyone who wants it in a single
-      # command, and it is what the badge above refers to.
+      # One command for anyone who wants the lot. `if: always()` so a failure
+      # anywhere still reports the complete picture rather than the first break.
       - name: Everything
         if: always()
         run: pnpm run check
