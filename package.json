@@ -15,18 +15,18 @@
   "scripts": {
     "build:contract": "cd contracts/proved && stellar contract build",
     "test:contract": "cd contracts/proved && cargo test",
-    "keys": "node scripts/keys.mjs",
-    "deploy:testnet": "node scripts/deploy.mjs --network testnet",
-    "deploy:mainnet": "node scripts/deploy.mjs --network mainnet",
-    "seed:testnet": "node scripts/seed.mjs --network testnet",
-    "demo:testnet": "node scripts/demo.mjs --network testnet",
-    "verify": "node scripts/verify.mjs",
-    "open:testnet": "node scripts/open-job.mjs",
-    "sync-env": "node scripts/sync-env.mjs",
+    "keys": "node --env-file-if-exists=.env.local scripts/keys.mjs",
+    "deploy:testnet": "node --env-file-if-exists=.env.local scripts/deploy.mjs --network testnet",
+    "deploy:mainnet": "node --env-file-if-exists=.env.local scripts/deploy.mjs --network mainnet",
+    "seed:testnet": "node --env-file-if-exists=.env.local scripts/seed.mjs --network testnet",
+    "demo:testnet": "node --env-file-if-exists=.env.local scripts/demo.mjs --network testnet",
+    "verify": "node --env-file-if-exists=.env.local scripts/verify.mjs",
+    "open:testnet": "node --env-file-if-exists=.env.local scripts/open-job.mjs",
+    "sync-env": "node --env-file-if-exists=.env.local scripts/sync-env.mjs",
     "dev": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
     "check": "pnpm run build:contract && pnpm run test:contract && pnpm run build:web",
-    "walk": "node scripts/walk.mjs"
+    "walk": "node --env-file-if-exists=.env.local scripts/walk.mjs"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.2.1"

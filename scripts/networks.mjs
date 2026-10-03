@@ -38,9 +38,10 @@ export const NETWORKS = {
     explorerContract: (a) => `https://stellar.expert/explorer/mainnet/contract/${a}`,
     explorerAccount: (a) => `https://stellar.expert/explorer/mainnet/account/${a}`,
     // Circle-issued USDC on Stellar mainnet, also a Stellar Asset Contract.
-    usdc:
-      process.env.STELLAR_USDC_MAINNET ??
-      "CC6X0XMG5MUK5YXQZSR2F2Z4T2DRU4IAOFOJNHQ2KAC7BTTH2AMPW4C2Z",
+    // The contract id is derived from the issuer at deploy time rather than
+    // hard-coded: a wrong address here would silently point the settlement
+    // asset at something else.
+    usdc: process.env.STELLAR_USDC_MAINNET ?? "",
     usdcIssuer:
       process.env.STELLAR_USDC_ISSUER_MAINNET ??
       "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",

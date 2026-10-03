@@ -48,6 +48,59 @@ function run(cmd, args, env = {}) {
   return r.stdout || "";
 }
 
+/**
+ * Cheap things to check before touching mainnet, so a half-finished deployment is
+ * impossible rather than merely unlikely.
+ */
+export async function preflight(netName, deployer) {
+  const net = getNetwork(netName);
+  const notes = [];
+
+  const res = await fetch(`${net.horizonUrl}/accounts/${deployer.publicKey()}`);
+  if (!res.ok) {
+    throw new Error(
+      `deployer ${deployer.publicKey()} does not exist on ${net.label}. ` +
+        `Create and fund it first, then re-run.`,
+    );
+  }
+  const acct = await res.json();
+  const native = acct.balances.find((b) => b.asset_type === "native");
+  const balance = Number(native?.balance ?? 0);
+
+  // Measured on testnet: a full deploy (Wasm upload + instance + constructor +
+  // rent) costs 0.0108 XLM. Per-transaction fees run ~0.00001-0.0001. 2 XLM is
+  // generous, but we want the warning long before anything could actually run out.
+  const NEEDED = 2;
+  if (balance < NEEDED) {
+    throw new Error(
+      `deployer holds ${balance.toFixed(4)} XLM, need at least ${NEEDED}. A deploy ` +
+        `costs ~0.011 XLM and a demo run ~0.002, but a balance this low cannot ` +
+        `survive an expired-TTL restore or a retry.`,
+    );
+  }
+  notes.push(`deployer balance ${balance.toFixed(4)} XLM`);
+
+  // The settlement asset must resolve to a contract that actually exists, and to
+  // the one the ledger reports. A wrong address here would point every payment
+  // at the wrong contract.
+  const token = net.usdc || sacIdForAsset("USDC", net.usdcIssuer, netName);
+  const sac = await fetch(
+    `${net.horizonUrl}/assets?asset_code=USDC&asset_issuer=${net.usdcIssuer}`,
+  );
+  if (sac.ok) {
+    const a = await sac.json();
+    const rec = a._embedded?.records?.[0];
+    if (rec?.contract_id && rec.contract_id !== token) {
+      throw new Error(
+        `derived USDC contract ${token} does not match what the ledger reports ` +
+          `(${rec.contract_id}). Refusing to deploy against a wrong asset.`,
+      );
+    }
+    notes.push(`USDC SAC ${token} confirmed on ${net.label}`);
+  }
+  return { notes, token, balance };
+}
+
 /** Build the Wasm. Fails loudly rather than shipping a stale artifact. */
 export function buildContract() {
   if (!existsSync(WASM)) {
@@ -76,6 +129,10 @@ export async function deploy({ network: netName, token }) {
 
   if (netName === "testnet") {
     await ensureFunded(net, deployer.publicKey());
+  } else {
+    const pf = await preflight(netName, deployer);
+    for (const n of pf.notes) console.log(`  ${n}`);
+    if (pf.token && !token) token = pf.token;
   }
 
   console.log(`\nDeploying Proved -> ${net.label}`);
@@ -110,7 +167,9 @@ export async function deploy({ network: netName, token }) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const netName = networkName();
   const net = getNetwork(netName);
-  let token = net.usdc;
+  // Derive the settlement asset's SAC id from its issuer rather than trusting a
+  // pasted constant. Horizon reports the same value as `contract_id`.
+  let token = net.usdc || sacIdForAsset("USDC", net.usdcIssuer, "mainnet");
 
   if (netName === "testnet") {
     // On testnet, settle in an asset we mint ourselves so the demo never depends
