@@ -87,7 +87,7 @@ export class Proved {
     });
 
     for (const kp of coSigners) {
-      await tx.signAuthEntries({ ...signer(kp), forAddress: kp.publicKey() });
+      await tx.signAuthEntries({ ...signer(kp), address: kp.publicKey() });
     }
 
     const sent = await tx.signAndSend({ ...signer(invoker) });
