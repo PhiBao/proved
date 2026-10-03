@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Proved — paid on proof. Symmetric verifiable settlement for cross-border service work.",
+  "description": "Proved \u2014 paid on proof. Symmetric verifiable settlement for cross-border service work.",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/PhiBao/proved.git" },
-  "engines": { "node": ">=22" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PhiBao/proved.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build:contract": "cd contracts/proved && stellar contract build",
     "test:contract": "cd contracts/proved && cargo test",
@@ -15,7 +20,13 @@
     "deploy:mainnet": "node scripts/deploy.mjs --network mainnet",
     "seed:testnet": "node scripts/seed.mjs --network testnet",
     "demo:testnet": "node scripts/demo.mjs --network testnet",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "open:testnet": "node scripts/open-job.mjs",
+    "sync-env": "node scripts/sync-env.mjs",
+    "dev": "pnpm --dir apps/web dev",
+    "build:web": "pnpm --dir apps/web build",
+    "check": "pnpm run build:contract && pnpm run test:contract && pnpm run build:web",
+    "walk": "node scripts/walk.mjs"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.2.1"

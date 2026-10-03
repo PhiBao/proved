@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #16130f;
+  --ink-soft: #4a443c;
+  --paper: #fdf8f0;
+  --card: #ffffff;
+  --line: #e6ded1;
+  --accent: #146b4f;
+  --accent-soft: #e6f2ec;
+  --warn: #9a3412;
+  --warn-soft: #fdf0e8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f4efe7;
+    --ink-soft: #a9a196;
+    --paper: #12100e;
+    --card: #1a1815;
+    --line: #2e2a25;
+    --accent: #4ade9e;
+    --accent-soft: #10281e;
+    --warn: #fb923c;
+    --warn-soft: #2a1a10;
+  }
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border p-5;
+    border-color: var(--line);
+    background: var(--card);
+  }
+  .label {
+    @apply text-[11px] uppercase tracking-[0.14em];
+    color: var(--ink-soft);
+  }
+  .btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.08);
+  }
+  .btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-ghost {
+    border: 1px solid var(--line);
+    color: var(--ink);
+    background: transparent;
+  }
+  .btn-ghost:hover {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+  }
+  .btn-ghost:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+  .pill-paid {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .pill-open {
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+    color: var(--ink-soft);
+  }
+  .pill-disputed {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
