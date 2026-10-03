@@ -11,3 +11,4 @@ apps/web/.env.local
 scripts/pitch/out/
 scripts/pitch/shots/
 scripts/pitch/node_modules/
+.vercel

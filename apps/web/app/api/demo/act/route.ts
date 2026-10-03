@@ -33,7 +33,13 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { action?: string; id?: string; description?: string; reason?: string };
+  let body: {
+    action?: string;
+    id?: string;
+    description?: string;
+    reason?: string;
+    artifact?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -83,13 +89,28 @@ export async function POST(req: Request) {
     let label: string;
 
     if (action === "submit") {
-      // The artifact is whatever text the caller names; its hash is what the
-      // contract compares, exactly as a real file's hash would be.
-      const description = String(body.description ?? "");
-      if (!description) {
-        return NextResponse.json({ error: "name the file you are delivering" }, { status: 400 });
+      // The delivered artifact is a digest the browser computed from a real
+      // file's bytes, so the comparison the contract makes is byte-for-byte.
+      //
+      // A description is still accepted for the scripted demo path, and is
+      // hashed the same way, but a caller that supplies `artifact` is handing us
+      // a real file's SHA-256 rather than a name.
+      const artifact = String(body.artifact ?? "").trim().toLowerCase();
+      if (/^[0-9a-f]{64}$/.test(artifact)) {
+        args = {
+          id: idBytes,
+          artifact_hash: new Uint8Array(artifact.match(/../g)!.map((b) => parseInt(b, 16))),
+        };
+      } else {
+        const description = String(body.description ?? "");
+        if (!description) {
+          return NextResponse.json(
+            { error: "choose the file you are delivering, or name it" },
+            { status: 400 },
+          );
+        }
+        args = { id: idBytes, artifact_hash: await sha(description) };
       }
-      args = { id: idBytes, artifact_hash: await sha(description) };
       signer = { address: worker.publicKey(), signTransaction: workerSigner.signTransaction };
       label = "Delivery";
     } else if (action === "challenge") {

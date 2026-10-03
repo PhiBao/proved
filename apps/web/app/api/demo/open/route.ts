@@ -38,7 +38,12 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { description?: string; amount?: string };
+  const hex = (u: Uint8Array) =>
+    [...u].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const hexToBytes = (h: string) =>
+    new Uint8Array(h.match(/../g)!.map((b) => parseInt(b, 16)));
+
+  let body: { description?: string; amount?: string; condition?: string };
   try {
     body = await req.json();
   } catch {
@@ -51,6 +56,26 @@ export async function POST(req: Request) {
   if (!description) {
     return NextResponse.json({ error: "describe the deliverable" }, { status: 400 });
   }
+
+  // The commitment is a hash of the bytes of a real file the payer chose, computed
+  // in their browser. The file itself never leaves the browser — only its hash
+  // reaches the chain — so "we prove byte-for-byte delivery of the thing you
+  // specified" is literal rather than a hash of a sentence someone typed.
+  //
+  // A description is still accepted, but it is hashed the same way, and the
+  // response says which of the two it used so nothing is ambiguous.
+  const condition = (() => {
+    const supplied = String(body.condition ?? "").trim().toLowerCase();
+    if (/^[0-9a-f]{64}$/.test(supplied)) {
+      return { bytes: hexToBytes(supplied), source: "file" as const };
+    }
+    return {
+      bytes: new Uint8Array(
+        new TextEncoder().encode(description),
+      ),
+      source: "description" as const,
+    };
+  })();
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) {
     return NextResponse.json({ error: "amount out of range" }, { status: 400 });
   }
@@ -80,9 +105,6 @@ export async function POST(req: Request) {
     const amountRaw = BigInt(Math.round(amount * 10 ** Number(decimals)));
 
     const id = crypto.getRandomValues(new Uint8Array(32));
-    const condition = new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(description)),
-    );
 
     const c = await contract.Client.from({ contractId, rpcUrl, networkPassphrase: passphrase });
     // v17 removed Keypair.signTransaction; KeypairSigner is the supported way.
@@ -111,7 +133,7 @@ export async function POST(req: Request) {
         freelancer: worker.publicKey(),
         client: client.publicKey(),
         amount: amountRaw,
-        condition_hash: condition,
+        condition_hash: condition.bytes,
         deliver_by: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
       },
       { publicKey: client.publicKey(), networkPassphrase: passphrase, signTransaction: signClient.signTransaction },
@@ -130,11 +152,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `the network rejected it: ${status}` }, { status: 502 });
     }
 
-    const hex = (u: Uint8Array) =>
-      [...u].map((b) => b.toString(16).padStart(2, "0")).join("");
     return NextResponse.json({
       jobId: hex(id),
-      conditionHex: hex(condition),
+      conditionHex: hex(condition.bytes),
+      committed: condition.source,
       txHash:
         sent.getTransactionResponse?.hash ?? sent.sendTransactionResponse?.hash ?? null,
       worker: worker.publicKey(),

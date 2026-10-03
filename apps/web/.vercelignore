@@ -1,0 +1,4 @@
+../contracts/proved/target/
+../../contracts/proved/target/
+.next/
+node_modules/

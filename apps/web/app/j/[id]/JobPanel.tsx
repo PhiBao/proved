@@ -16,6 +16,7 @@ import {
   money,
   READ_AS,
   sha256Bytes,
+  sha256Of,
   type ClientConfig,
 } from "@/lib/client-config";
 
@@ -436,7 +437,13 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
   );
 }
 
-/** Demo delivery: name the file, the contract gets its hash. */
+/**
+ * Demo delivery: pick the real file, or fall back to naming it.
+ *
+ * The file path sends the browser-computed digest, so the contract compares a
+ * real artifact's bytes. Only the fallback — naming a file — commits to a hash
+ * of the name, and the job screen says which one happened.
+ */
 function DemoDeliver({
   onSubmit,
   busy,
@@ -445,23 +452,73 @@ function DemoDeliver({
   busy: boolean;
 }) {
   const [name, setName] = useState("");
+  const [digest, setDigest] = useState<string | null>(null);
+  const [spec, setSpec] = useState<string | null>(null);
+
   return (
     <div className="flex flex-col gap-2">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="filename to deliver, e.g. brand-guidelines.pdf"
-        aria-label="filename to deliver"
-        className="mono h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
-        style={{ borderColor: "var(--line)" }}
-      />
-      <button
-        className="btn btn-primary w-full"
-        disabled={busy || !name.trim()}
-        onClick={() => onSubmit("submit", { description: name.trim() })}
-      >
-        {busy ? "Confirming on chain…" : "Deliver it (demo)"}
-      </button>
+      {digest ? (
+        <div className="card" style={{ borderColor: "var(--accent)" }}>
+          <p className="mono text-[13px] break-all">
+            <span style={{ color: "var(--ink-soft)" }}>delivering </span>
+            {spec}
+          </p>
+          <p className="mono text-[11px] break-all mt-1" style={{ color: "var(--ink-soft)" }}>
+            sha256 {digest}
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary w-full mt-2"
+            disabled={busy}
+            onClick={() => onSubmit("submit", { artifact: digest })}
+          >
+            {busy ? "Confirming on chain…" : "Deliver these exact bytes"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost w-full mt-2"
+            onClick={() => {
+              setDigest(null);
+              setSpec(null);
+            }}
+          >
+            Choose a different file
+          </button>
+        </div>
+      ) : (
+        <>
+          <label className="btn btn-primary w-full cursor-pointer">
+            {busy ? "Confirming on chain…" : "Deliver a file"}
+            <input
+              type="file"
+              className="sr-only"
+              disabled={busy}
+              onChange={async (e) => {
+                const f = e.currentTarget.files?.[0];
+                if (!f) return;
+                setDigest(await sha256Of(await f.arrayBuffer()));
+                setSpec(`${f.name} · ${f.size.toLocaleString()} bytes`);
+              }}
+            />
+          </label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="or name the file, e.g. brand-guidelines.pdf"
+            aria-label="filename to deliver"
+            className="mono h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
+            style={{ borderColor: "var(--line)" }}
+          />
+          <button
+            type="button"
+            className="btn btn-ghost w-full"
+            disabled={busy || !name.trim()}
+            onClick={() => onSubmit("submit", { description: name.trim() })}
+          >
+            Deliver by name instead (weaker)
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -486,7 +543,7 @@ function DeliverButton({
         onChange={async (e) => {
           const file = e.currentTarget.files?.[0];
           if (!file) return;
-          onDeliver(await sha256Bytes(await file.text()));
+          onDeliver(await sha256Bytes(await file.arrayBuffer()));
         }}
       />
     </label>

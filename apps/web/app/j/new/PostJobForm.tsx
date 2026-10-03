@@ -1,16 +1,19 @@
 "use client";
 
 /**
- * Demo-mode job creation.
+ * Funding a job, in demo mode.
  *
- * Opening a job needs two signatures — payer and worker — which a single browser
+ * Opening a job needs two signatures — payer and worker — which one browser
  * cannot produce. On testnet this form posts to a server action that signs with
- * the repository's committed testnet keys, so the whole flow is reproducible by
- * anyone who clones it. That is a property of a testnet demo, and the form says
- * so on the button.
+ * the repository's committed testnet keys, so the flow is reproducible by anyone
+ * who clones it. That is a property of a testnet demo, and the button says so.
+ *
+ * The commitment is the point of the form. You pick a real file; its SHA-256 is
+ * what gets written on chain. The file never leaves your browser — only the hash
+ * does — so "the worker gets paid for byte-for-byte delivering the thing you
+ * named" is literal, and there is no server in the middle to be trusted.
  */
 import { useState } from "react";
-import { sha256Hex } from "@/lib/proved";
 
 export function PostJobForm({
   network,
@@ -21,6 +24,22 @@ export function PostJobForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [digest, setDigest] = useState<string | null>(null);
+  const [spec, setSpec] = useState<string | null>(null);
+
+  const toHex = (buf: ArrayBuffer) =>
+    [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  /** Hash the chosen file's bytes in the browser. The file is never uploaded. */
+  async function commitTo(file: File) {
+    setErr(null);
+    try {
+      setDigest(toHex(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())));
+      setSpec(`${file.name} · ${file.size.toLocaleString()} bytes`);
+    } catch {
+      setErr("could not read that file");
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,9 +51,12 @@ export function PostJobForm({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          description: fd.get("description"),
+          description: spec ?? fd.get("description"),
           amount: fd.get("amount"),
           worker: fd.get("worker"),
+          // Sent only when a real file was chosen; otherwise the server hashes
+          // the description, which is weaker and labelled as such on the job.
+          ...(digest ? { condition: digest } : {}),
         }),
       });
       const body = await res.json();
@@ -49,18 +71,59 @@ export function PostJobForm({
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       <div>
-        <label className="label mb-1.5 block" htmlFor="description">
-          What is being delivered?
-        </label>
-        <input
-          id="description"
-          name="description"
-          required
-          defaultValue="homepage-mockup.fig"
-          placeholder="the file whose hash defines done"
-          className="mono h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
-          style={{ borderColor: "var(--line)" }}
-        />
+        <span className="label mb-1.5 block">The deliverable</span>
+
+        {digest ? (
+          <div className="card space-y-2" style={{ borderColor: "var(--accent)" }}>
+            <p className="mono text-[13px] break-all">
+              <span style={{ color: "var(--ink-soft)" }}>committing to </span>
+              {spec}
+            </p>
+            <p className="mono text-[11px] break-all" style={{ color: "var(--ink-soft)" }}>
+              sha256 {digest}
+            </p>
+            <p className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+              Written on chain before any work starts. The file stayed in your browser — only this
+              hash was sent.
+            </p>
+            <label className="btn btn-ghost cursor-pointer">
+              Choose a different file
+              <input
+                type="file"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  if (f) void commitTo(f);
+                }}
+              />
+            </label>
+          </div>
+        ) : (
+          <>
+            <label className="btn btn-primary w-full cursor-pointer">
+              Choose the deliverable file
+              <input
+                type="file"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0];
+                  if (f) void commitTo(f);
+                }}
+              />
+            </label>
+            <p className="mt-2 text-[13px]" style={{ color: "var(--ink-soft)" }}>
+              Or name it, which commits to a hash of the name instead — weaker, and the job will
+              say so.
+            </p>
+            <input
+              name="description"
+              defaultValue="homepage-mockup.fig"
+              placeholder="the file whose hash defines done"
+              className="mono mt-2 h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
+              style={{ borderColor: "var(--line)" }}
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -117,8 +180,4 @@ export function PostJobForm({
       </p>
     </form>
   );
-}
-
-export async function unusedSha() {
-  return sha256Hex("");
 }

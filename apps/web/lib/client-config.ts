@@ -105,12 +105,28 @@ export function normaliseJobId(raw: string): string {
 }
 
 /** SHA-256 of a string, as bytes. The contract compares `BytesN<32>`. */
-export async function sha256Bytes(text: string): Promise<Uint8Array> {
-  const bytes = new TextEncoder().encode(text);
+export async function sha256Bytes(input: string | ArrayBuffer): Promise<Uint8Array> {
+  // Text is encoded on the caller's behalf; raw bytes are passed through, because
+  // encoding a file's bytes as text would corrupt them and quietly break
+  // byte-for-byte comparison for anything that is not valid UTF-8.
+  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : new Uint8Array(input);
   return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
 }
 
 /** SHA-256 of a string, hex. Matches what the scripts print. */
+/**
+ * SHA-256 of raw bytes, hex.
+ *
+ * Takes an ArrayBuffer rather than a File so this stays isomorphic and testable
+ * off a browser. Hashing a file's decoded text is not equivalent — it replaces
+ * anything that is not valid UTF-8, so two different files can collide, and a
+ * delivered binary would never match the payer's copy.
+ */
+export async function sha256Of(buffer: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function sha256Hex(text: string): Promise<string> {
   return [...(await sha256Bytes(text))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }

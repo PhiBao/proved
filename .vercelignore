@@ -1,0 +1,20 @@
+# The Rust build tree and Next's build cache are large and useless to the build
+# server: `target/` alone is 1.6 GB and pushed the deployment over Vercel's
+# 100 MB upload limit. Neither is needed — CI builds the contract from source,
+# and Vercel builds the app itself.
+target/
+**/target/
+.next/
+**/.next/
+node_modules/
+**/node_modules/
+
+# Generated video frames and rendered output. The committed MP4 under artifacts/
+# is what matters; the intermediate files are not.
+scripts/pitch/out/
+scripts/pitch/shots/
+
+# Secrets never belong in a deployment bundle.
+.env.local
+**/.env.local
+.env*.local

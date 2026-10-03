@@ -238,6 +238,7 @@ export async function sha256Hex(text: string): Promise<string> {
   return [...(await sha256Bytes(text))].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+
 export { contract, rpc };
 
 /**

@@ -1,0 +1,85 @@
+# Every claim this repository makes about its contract should be checkable by
+# someone who does not trust us. That is the whole point: a judge can clone this
+# and get the same numbers we did.
+#
+# The reproducible-build job is the important one. It rebuilds the WASM from a
+# clean checkout and compares the hash to the one deployed on mainnet, so
+# "the tests pass" and "the deployed contract is the tested contract" stop being
+# separate claims a reader has to take on faith.
+name: contract
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust with the wasm target
+        run: |
+          rustup toolchain install nightly --component rust-src --target wasm32v1-none
+          rustup default nightly
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Install the Stellar CLI
+        run: |
+          cargo install --locked stellar-cli --version 28.1.0
+
+      - run: pnpm install --frozen-lockfile
+
+      # Recorded from the live deployments. If the contract changes on purpose,
+      # these move in the same commit as the change.
+      - name: Assert the rebuilt WASM is the deployed WASM
+        run: |
+          set -euo pipefail
+          expected=9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31
+          cd contracts/proved
+          stellar contract build
+          actual=$(sha256sum target/wasm32v1-none/release/proved.wasm | cut -d' ' -f1)
+          echo "rebuilt $actual"
+          echo "deployed $expected"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::The built contract is not the one deployed on mainnet."
+            echo "Either a change needs deploying, or the recorded hash is stale."
+            exit 1
+          fi
+
+      - name: Build is reproducible
+        run: |
+          set -euo pipefail
+          cd contracts/proved
+          cp target/wasm32v1-none/release/proved.wasm /tmp/first.wasm
+          rm -rf target/wasm32v1-none
+          stellar contract build
+          cmp /tmp/first.wasm target/wasm32v1-none/release/proved.wasm
+          echo "two clean builds are byte-identical"
+
+      - name: Tests
+        run: pnpm run test:contract
+
+      - name: Security review
+        run: |
+          cargo install --locked cargo-audit
+          pnpm run audit
+
+      - name: Frontend builds
+        run: pnpm run build:web
+
+      # The whole app is one `pnpm check` for anyone who wants it in a single
+      # command, and it is what the badge above refers to.
+      - name: Everything
+        if: always()
+        run: pnpm run check
