@@ -56,11 +56,30 @@ export async function preflight(netName, deployer) {
   const net = getNetwork(netName);
   const notes = [];
 
-  const res = await fetch(`${net.horizonUrl}/accounts/${deployer.publicKey()}`);
+  // Which address did the operator think this key controls? If they told us, hold
+  // them to it. A seed phrase and a secret key for the *wrong* account still
+  // produce a perfectly valid, perfectly wrong keypair, and the only symptom is a
+  // contract at an address nobody holds. Compare before anything else.
+  const expected = process.env.DEPLOYER_ADDRESS?.trim();
+  const derived = deployer.publicKey();
+  if (expected && expected !== derived) {
+    throw new Error(
+      `the deployer key does not control the expected address.\n` +
+        `  key derives to  ${derived}\n` +
+        `  you expected    ${expected}\n` +
+        `Set DEPLOYER_ADDRESS to the address you intend to deploy from, and make ` +
+        `sure DEPLOYER_SECRET is the key or 12/24-word mnemonic for it. Refusing ` +
+        `to continue rather than deploying to an address you cannot sign for.`,
+    );
+  }
+  notes.push(`deployer key ${derived}`);
+
+  const res = await fetch(`${net.horizonUrl}/accounts/${derived}`);
   if (!res.ok) {
     throw new Error(
-      `deployer ${deployer.publicKey()} does not exist on ${net.label}. ` +
-        `Create and fund it first, then re-run.`,
+      `deployer ${derived} does not exist on ${net.label} — it has never been ` +
+        `funded, and funding an address is what creates it. Check that the key ` +
+        `in DEPLOYER_SECRET is the one for the account you meant to use.`,
     );
   }
   const acct = await res.json();

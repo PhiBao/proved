@@ -9,7 +9,7 @@
  * supplied through the environment only.
  */
 import { Keypair } from "@stellar/stellar-sdk";
-import { createHash } from "node:crypto";
+import { createHash, pbkdf2Sync } from "node:crypto";
 import { writeFileSync, existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -74,20 +74,62 @@ export function loadIdentities() {
 /**
  * Resolve the keypair for a role.
  * Testnet: the committed keyfile. Mainnet: DEPLOYER_SECRET / ROLE_SECRET env.
+ *
+ * The environment value may be either a `S…` secret key or a BIP-39 mnemonic.
+ * Seed phrases are the more common way a hardware-wallet user exports a mainnet
+ * account, and silently trying to parse one as a secret key fails with a
+ * baffling "invalid secret key length", so the shape is detected explicitly.
  */
 export function keypairFor(role, network) {
   if (network === "mainnet") {
-    const envKey = process.env[`${role.toUpperCase()}_SECRET`] ?? process.env.DEPLOYER_SECRET;
-    if (!envKey) {
+    const raw = process.env[`${role.toUpperCase()}_SECRET`] ?? process.env.DEPLOYER_SECRET;
+    if (!raw) {
       throw new Error(
         `mainnet deployment needs ${role.toUpperCase()}_SECRET (or DEPLOYER_SECRET) in the environment`,
       );
     }
-    return Keypair.fromSecret(envKey);
+    return keypairFromEnv(raw);
   }
   const ids = loadIdentities();
   if (!ids.secret?.[role]) throw new Error(`no testnet key for role "${role}"`);
   return Keypair.fromSecret(ids.secret[role]);
+}
+
+/**
+ * Build a keypair from a `S…` secret or a 12/24-word BIP-39 mnemonic.
+ *
+ * The SDK v17 exposes no `fromMnemonic`, so BIP-39 is implemented here:
+ * PBKDF2-HMAC-SHA512 over the mnemonic with salt `"mnemonic" + passphrase`,
+ * 2048 iterations, 64 bytes out, and the first 32 are the ed25519 seed.
+ *
+ * @param {string} raw
+ * @param {string} [passphrase] BIP-39 passphrase, if the seed uses one
+ */
+export function keypairFromEnv(raw, passphrase = "") {
+  const value = raw.trim();
+  if (value.startsWith("S")) return Keypair.fromSecret(value);
+
+  const words = value.split(/\s+/);
+  if (words.length !== 12 && words.length !== 24) {
+    throw new Error(
+      `expected a Stellar secret key (S…) or a 12/24-word BIP-39 mnemonic; got ` +
+        `${words.length} tokens. If this is a passphrase rather than a mnemonic, ` +
+        `use Keypair.fromRawEd25519Seed(sha256(passphrase)).`,
+    );
+  }
+  const seed = bip39Seed(words.join(" "), passphrase);
+  return Keypair.fromRawEd25519Seed(seed.subarray(0, 32));
+}
+
+/** BIP-39 seed derivation: 64 bytes from the mnemonic and an optional passphrase. */
+export function bip39Seed(mnemonic, passphrase = "") {
+  return pbkdf2Sync(
+    Buffer.from(mnemonic.normalize("NFKD"), "utf8"),
+    Buffer.from(`mnemonic${passphrase.normalize("NFKD")}`, "utf8"),
+    2048,
+    64,
+    "sha512",
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
