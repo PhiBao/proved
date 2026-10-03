@@ -180,6 +180,32 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
     };
   }, [job, net]);
 
+  /**
+   * Demo path. On testnet the actions are performed by the committed keys via
+   * /api/demo/act, so the flow can be clicked through without a wallet and
+   * every step is still a real transaction with a real hash. Mainnet refuses.
+   */
+  async function demoAct(action: string, extra: Record<string, unknown> = {}) {
+    setBusy(action);
+    setNote(null);
+    try {
+      const res = await fetch("/api/demo/act", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, id: jobId, ...extra }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error ?? "the contract refused this");
+      setTxHash(body.txHash ?? null);
+      setNote({ kind: "ok", text: `${body.label} confirmed on chain` });
+      await refresh();
+    } catch (e) {
+      setNote({ kind: "bad", text: shortError(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   if (!job) {
     return (
       <div className="card">
@@ -192,6 +218,8 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
     );
   }
 
+  // Demo affordances are testnet-only; the route refuses them on mainnet.
+  const demo = net.network === "testnet";
   const isClient = role === "client";
   const you = isClient ? job.client : job.freelancer;
   const status = STATUS[state];
@@ -292,6 +320,9 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
                 )
               }
             />
+            {demo && (
+              <DemoDeliver busy={busy === "submit"} onSubmit={demoAct} />
+            )}
           </>
         )}
 
@@ -308,6 +339,7 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
                 act("submit", { id: jobIdArg(jobId), artifact_hash: digest }, "Delivery")
               }
             />
+            {demo && <DemoDeliver busy={busy === "submit"} onSubmit={demoAct} />}
           </>
         )}
 
@@ -333,6 +365,15 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
             >
               {busy === "challenge" ? "Confirm in wallet…" : "Something’s wrong"}
             </button>
+            {demo && (
+              <button
+                className="btn btn-ghost w-full"
+                disabled={busy !== null}
+                onClick={() => demoAct("challenge")}
+              >
+                {busy === "challenge" ? "Posting the bond…" : "Raise it anyway (demo)"}
+              </button>
+            )}
           </>
         )}
 
@@ -349,6 +390,15 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
             >
               {busy === "confirm" ? "Confirm in wallet…" : "Settle it on chain"}
             </button>
+            {demo && (
+              <button
+                className="btn btn-primary w-full"
+                disabled={busy !== null}
+                onClick={() => demoAct("confirm")}
+              >
+                {busy === "confirm" ? "Adjudicating…" : "Adjudicate (demo)"}
+              </button>
+            )}
           </>
         )}
 
@@ -382,6 +432,36 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Demo delivery: name the file, the contract gets its hash. */
+function DemoDeliver({
+  onSubmit,
+  busy,
+}: {
+  onSubmit: (action: string, extra: Record<string, unknown>) => Promise<void>;
+  busy: boolean;
+}) {
+  const [name, setName] = useState("");
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="filename to deliver, e.g. brand-guidelines.pdf"
+        aria-label="filename to deliver"
+        className="mono h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
+        style={{ borderColor: "var(--line)" }}
+      />
+      <button
+        className="btn btn-primary w-full"
+        disabled={busy || !name.trim()}
+        onClick={() => onSubmit("submit", { description: name.trim() })}
+      >
+        {busy ? "Confirming on chain…" : "Deliver it (demo)"}
+      </button>
     </div>
   );
 }

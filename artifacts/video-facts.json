@@ -1,0 +1,13 @@
+{
+  "site": "https://proved-kiters-projects-e9e82f9c.vercel.app",
+  "jobs": {
+    "paid": "8659c7af2b85bd7a3908a407236407a71202c128b6c42c9e82fc3245de67f005",
+    "disputed": "eed953803bac59f867eda29ed814f979ea6b919f8931380faf67898715eb5675"
+  },
+  "txs": {
+    "delivery": "eb1025275cb7e563d156131008306ece03b2b34c39590c836eef20591a37fc96",
+    "challenge": "4b4af719e75670aaac4e3b9b619a05ea1e21db8f15db0acac55015cfd9d14f7c",
+    "adjudication": "2210aa294bc7fc612a6f2fd34b7d11956586dcf1d420346f2defc72700d1b2e2"
+  },
+  "refusal": "the contract refused: that job is not in a state that allows this. Released money cannot be reversed."
+}

@@ -8,3 +8,6 @@ dist/
 .DS_Store
 apps/web/.env.local
 .env.local
+scripts/pitch/out/
+scripts/pitch/shots/
+scripts/pitch/node_modules/
