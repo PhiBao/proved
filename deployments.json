@@ -1,0 +1,10 @@
+{
+  "_comment": "Contract ids per network. Written by scripts/deploy.mjs.",
+  "testnet": {
+    "contractId": "CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS",
+    "asset": "CDKB73XPPII2DEIFJD5VQ66KJTIVG3HP646DGFL2577XE5MAJLCR3UJP",
+    "assetCode": "PUSD",
+    "issuer": "GCUWEYRK3V3KAYKK3HZ2X67ZXHQACWZPC2BHGIYSCH26USTHJVSEVQQW",
+    "recordedAt": "2026-10-03T10:03:44.465Z"
+  }
+}

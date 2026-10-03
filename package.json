@@ -1,0 +1,23 @@
+{
+  "name": "proved",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Proved — paid on proof. Symmetric verifiable settlement for cross-border service work.",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/PhiBao/proved.git" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build:contract": "cd contracts/proved && stellar contract build",
+    "test:contract": "cd contracts/proved && cargo test",
+    "keys": "node scripts/keys.mjs",
+    "deploy:testnet": "node scripts/deploy.mjs --network testnet",
+    "deploy:mainnet": "node scripts/deploy.mjs --network mainnet",
+    "seed:testnet": "node scripts/seed.mjs --network testnet",
+    "demo:testnet": "node scripts/demo.mjs --network testnet",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^17.2.1"
+  }
+}

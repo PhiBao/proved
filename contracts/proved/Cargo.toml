@@ -1,0 +1,26 @@
+[package]
+name = "proved"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = "28.0.0"
+
+[dev-dependencies]
+soroban-sdk = { version = "28.0.0", features = ["testutils"] }
+
+[profile.release]
+# stellar contract build refuses to run without overflow-checks
+overflow-checks = true
+opt-level = "z"
+strip = "symbols"
+debug = false
+debug-assertions = false
+codegen-units = 1
+lto = true
+panic = "abort"
