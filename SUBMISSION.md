@@ -16,7 +16,7 @@ https://github.com/PhiBao/proved/releases/download/v0.1/proved-pitch.mp4
 
 ## Other links (optional)
 - Live app: https://proved-kiters-projects-e9e82f9c.vercel.app
-- Contract: https://stellar.expert/explorer/testnet/contract/CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS
+- Contract: https://stellar.expert/explorer/mainnet/contract/CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ
 - Demo run: `pnpm run demo:testnet` — prints real hashes for both paths and the clawback attempt
 - Read the contract's guarantees back: `pnpm run verify`
 
@@ -54,9 +54,23 @@ specific — this is usually a judging criterion."*
 > pending; Soroban's atomic bilateral authorisation replaces an escrow agent's
 > discretion entirely.
 >
-> Live on Stellar **testnet** (`CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS`),
-> 20/20 contract tests, not audited, no real value. `pnpm run demo:testnet`
-> reproduces every number with real transaction hashes.
+> The commitment is a real file's SHA-256, computed in the payer's browser before
+> any work starts — the file never leaves their machine, so "delivered byte-for-byte
+> what was agreed" is literal, and only a hash reaches the chain.
+>
+> **Live on Stellar mainnet** (`CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ`),
+> settling in Circle's USDC. `pnpm run verify -- --network mainnet` asks the deployed
+> contract what a dispute costs and gets $1.80 on a $1,200 job back from mainnet
+> contract code. 34 contract tests (23 correctness, 11 adversarial), 0 known
+> dependency vulnerabilities, a reproducible build whose hash CI checks against the
+> mainnet deployment on every push. Unaudited by a human — that is stated, not
+> hidden.
+>
+> **What we do not claim.** The contract sees a hash, never the content: it proves
+> identity, not quality, which is why the dispute path exists. The $1 bond floor
+> puts our honest range at jobs above ~$10. A first-time freelancer locks 3% of the
+> job (returned in full on a verified release). `pnpm run demo:testnet` reproduces
+> every number with real transaction hashes.
 
 ## Before submitting
 - [ ] Logged in on demo.stellarpassport.xyz and registered for the hackathon
@@ -64,4 +78,4 @@ specific — this is usually a judging criterion."*
 - [ ] Repo URL and video URL from this file
 - [ ] Track set to **General Track**
 - [ ] Email + T&C ticked
-- [ ] Optional: mainnet deployment (needs a funded account, see below)
+- [x] Mainnet deployment, verified against Circle's real USDC
