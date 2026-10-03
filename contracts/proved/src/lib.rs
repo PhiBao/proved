@@ -502,9 +502,18 @@ impl Proved {
 }
 
 #[cfg(test)]
+mod common;
+#[cfg(test)]
 mod test;
+#[cfg(test)]
+mod adversarial;
 
 /// 10^n, for turning an asset's declared precision into a strops-per-unit scale.
+///
+/// Left private on purpose: widening its visibility changes the compiled WASM,
+/// and the deployed contract on mainnet is built from exactly this source. The
+/// test harness wraps it rather than widening it, so `cargo test` and the shipped
+/// binary can never be talking about different conversions.
 fn pow10(n: u32) -> i128 {
     let mut out: i128 = 1;
     for _ in 0..n {

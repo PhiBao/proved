@@ -5,7 +5,8 @@
     "asset": "CDKB73XPPII2DEIFJD5VQ66KJTIVG3HP646DGFL2577XE5MAJLCR3UJP",
     "assetCode": "PUSD",
     "issuer": "GCUWEYRK3V3KAYKK3HZ2X67ZXHQACWZPC2BHGIYSCH26USTHJVSEVQQW",
-    "recordedAt": "2026-10-03T10:03:44.465Z"
+    "recordedAt": "2026-10-03T10:03:44.465Z",
+    "wasmSha256": "9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31"
   },
   "mainnet": {
     "contractId": "CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ",
@@ -13,6 +14,7 @@
     "assetCode": "USDC",
     "issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     "recordedAt": "2026-10-03T19:00:31.805Z",
-    "note": "Bound to Circle-issued USDC. Stellar's USDC carries 7 decimals, and the contract reads that from the asset at init rather than assuming."
+    "note": "Bound to Circle-issued USDC. Stellar's USDC carries 7 decimals, and the contract reads that from the asset at init rather than assuming.",
+    "wasmSha256": "9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31"
   }
 }

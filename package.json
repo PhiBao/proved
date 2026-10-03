@@ -15,6 +15,7 @@
   "scripts": {
     "build:contract": "cd contracts/proved && stellar contract build",
     "test:contract": "cd contracts/proved && cargo test",
+    "audit": "./scripts/audit.sh",
     "deploy:testnet": "node --env-file-if-exists=.env.local scripts/deploy.mjs --network testnet",
     "deploy:mainnet": "node --env-file-if-exists=.env.local scripts/deploy.mjs --network mainnet",
     "demo:testnet": "node --env-file-if-exists=.env.local scripts/demo.mjs --network testnet",
@@ -26,7 +27,7 @@
     "sync-env": "node --env-file-if-exists=.env.local scripts/sync-env.mjs",
     "dev": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
-    "check": "pnpm run build:contract && pnpm run test:contract && pnpm run build:web"
+    "check": "pnpm run build:contract && pnpm run test:contract && pnpm run audit && pnpm run build:web"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.2.1"
