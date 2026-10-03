@@ -12,3 +12,8 @@ scripts/pitch/out/
 scripts/pitch/shots/
 scripts/pitch/node_modules/
 .vercel
+
+# The video generator is a local toolchain, not part of the submission. It is
+# absent from git history on purpose: the pitch is a video, and shipping the
+# HTML/Playwright rig that rendered it adds weight without adding evidence.
+scripts/pitch/
