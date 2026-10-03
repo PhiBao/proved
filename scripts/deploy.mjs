@@ -9,13 +9,15 @@
  *   node scripts/deploy.mjs --network mainnet
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync, existsSync, mkdirSync } from "node:fs";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   Account,
+  Address,
   Operation,
   TransactionBuilder,
   rpc,
@@ -77,25 +79,197 @@ function run(cmd, args, env = {}) {
 }
 
 /**
- * Put a keypair into a private, temporary identity directory and return the
- * directory plus the address to pass as `--source-account-id`.
+ * Write a keypair into a throwaway CLI config directory as a seed phrase, and
+ * deploy by identity name.
  *
- * The alternative — putting the key in argv — exposes it to `ps` for the whole
- * lifetime of the deploy. Directory is chmod 700 and removed by the caller.
+ * The CLI wants `--source <secret>`, which puts the key in argv where any
+ * process on the machine can read it. It also accepts a mnemonic, and that is
+ * the shape it stores natively — v28 refuses to import an `S…` key without a
+ * pty, but a seed phrase can be written directly as the toml the CLI expects.
+ * The mnemonic never appears in argv, and the directory is 0700 and removed by
+ * the caller.
  */
-function withIdentity(kp, fn) {
+function deployWithCli({ net, wasmPath, token, deployer, netName }) {
   const dir = mkdtempSync(join(tmpdir(), "proved-id-"));
   try {
     chmodSync(dir, 0o700);
+    mkdirSync(join(dir, "identity"), { mode: 0o700 });
+    // The CLI reads `secret_key` from an identity toml directly; verified, not
+    // assumed — `stellar keys public-key` resolves it without any prompt.
     writeFileSync(
-      join(dir, "identity.json"),
-      JSON.stringify({ id: "deployer", publicKey: kp.publicKey(), secretKey: kp.secret() }),
+      join(dir, "identity", "deployer.toml"),
+      `public_key = "${deployer.publicKey()}"\nsecret_key = "${deployer.secret()}"\n`,
       { mode: 0o600 },
     );
-    return fn(dir, kp.publicKey());
+
+    const out = run("stellar", [
+      "contract",
+      "deploy",
+      "--wasm",
+      wasmPath,
+      "--network",
+      netName,
+      "--source",
+      "deployer",
+      "--config-dir",
+      dir,
+      "--rpc-url",
+      net.rpcUrl,
+      "--network-passphrase",
+      net.passphrase,
+      ...(token ? ["--", "--token", token] : []),
+    ]);
+    return { out, dir };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Upload the WASM and instantiate the contract, signing in-process.
+ *
+ * Retained for reference: it is what an in-process deploy looks like, and it is
+ * where the `constructorArgs` detail was found. The CLI is used instead because
+ * it handles constructor auth and the create-contract salt correctly, and the
+ * hand-rolled version did not.
+ *
+ * @param {object} o
+ * @param {ReturnType<getNetwork>} o.net
+ * @param {string} o.wasmPath
+ * @param {string|null} o.token
+ * @param {import("@stellar/stellar-sdk").Keypair} o.deployer
+ */
+async function deployWithSdk({ net, wasmPath, token, deployer }) {
+  const server = new rpc.Server(net.rpcUrl);
+  const wasm = readFileSync(wasmPath);
+  const sha = createHash("sha256").update(wasm).digest("hex");
+  const address = deployer.publicKey();
+  const txHashes = [];
+
+  // The Soroban RPC's `sequenceNumber()` is the NEXT usable sequence, not the last
+  // used one, so it is used as-is. Adding 1 — the habit carried over from
+  // Horizon, which does report the last-used value — gets every transaction
+  // rejected as tx_bad_seq. Confirmed by submitting at the reported value.
+  let seq = BigInt((await server.getAccount(address)).sequenceNumber());
+
+  /** Simulate, sign, submit, and return the hash. One host op per tx. */
+  async function submit(label, operation) {
+    const BASE_FEE = 100; // stroops; the minimum the network accepts
+
+    // Pin the sequence number for this submission. Reading the mutable counter
+    // inside `build` meant the simulation and the real transaction could be
+    // built with different numbers, which the network rejects as tx_bad_seq.
+    const thisSeq = seq++;
+    const build = () =>
+      new TransactionBuilder(new Account(address, thisSeq.toString()), {
+        fee: String(BASE_FEE),
+        networkPassphrase: net.passphrase,
+      })
+        .addOperation(operation)
+        .setTimeout(300)
+        .build();
+
+    const sim = await server.simulateTransaction(build());
+    if (sim.error) {
+      throw new Error(`${label} failed to simulate: ${sim.error}`);
+    }
+    // The parsed wrapper hands back an object; the raw RPC response hands back
+    // base64 XDR. Accept either, and read the fee from whichever shape arrived
+    // rather than assuming the property name.
+    const raw = sim.transactionData;
+    let fee;
+    if (typeof raw === "string") {
+      fee = BigInt(
+        JSON.parse(JSON.stringify(xdr.SorobanTransactionData.fromXDR(raw, "base64"))).resource_fee,
+      );
+    } else {
+      const obj = JSON.parse(JSON.stringify(raw._data ?? raw));
+      fee = BigInt(obj.resource_fee ?? obj.resourceFee ?? "0");
+    }
+    if (fee === 0n) {
+      throw new Error(`${label}: simulation returned no resource fee, refusing to guess`);
+    }
+
+    // prepareTransaction re-simulates and folds the resource fee into the envelope.
+    const prepared = await server.prepareTransaction(build());
+
+    // `sign` mutates the transaction and returns nothing; do not chain it.
+    prepared.sign(deployer);
+    const sent = await server.sendTransaction(prepared);
+
+    const hash = sent.hash ?? sent.txHash;
+    if (sent.status && sent.status !== "PENDING" && sent.status !== "DUPLICATE") {
+      const errs = sent.errorResult ?? sent.status;
+      throw new Error(`${label} rejected: ${JSON.stringify(errs).slice(0, 300)}`);
+    }
+    txHashes.push(hash);
+    console.log(`  ${label} fee        ${(Number(fee) + BASE_FEE) / 1e7} XLM`);
+
+    // Wait for inclusion before the next op, so the WASM is readable when the
+    // contract that references it is created.
+    for (let i = 0; i < 60; i++) {
+      const got = await server.getTransaction(hash);
+      if (got.status === "SUCCESS") return { hash, result: got.resultMetaJson ?? null };
+      if (got.status === "FAILED") throw new Error(`${label} failed on chain`);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    throw new Error(`${label} was not included within 60s`);
+  }
+
+  const { hash: uploadTx } = await submit(
+    "upload wasm",
+    Operation.uploadContractWasm({ wasm, source: address }),
+  );
+  console.log(`  wasm uploaded   ${uploadTx}`);
+
+  if (!token) {
+    throw new Error("no settlement asset: refusing to deploy a contract that settles in nothing");
+  }
+
+  // The constructor takes the asset, so its auth entry is the deployer's call to
+  // the token contract. Build it explicitly and attach it.
+  const tokenAddress = new Address(token);
+
+  // The constructor arg must be passed explicitly. `createCustomContract`
+  // defaults it to an empty list, and the VM then rejects the call with
+  // MismatchingParameterLen — the constructor takes exactly one Address.
+  // `toScVal` produces the Address value the contract's generated ABI expects.
+  const createResult = await submit(
+    "create contract",
+    Operation.createCustomContract({
+      address: tokenAddress,
+      wasmHash: Buffer.from(sha, "hex"),
+      source: address,
+      constructorArgs: [tokenAddress.toScVal()],
+    }),
+  );
+  const createTx = createResult.hash;
+  console.log(`  contract created ${createTx}`);
+
+  // The contract id is a function of the deployer and the network sequence, so
+  // read it back from the created-contract event rather than predicting it.
+  let contractId = null;
+  for (const ev of createResult.result?.events ?? []) {
+    const t = ev.type ?? ev;
+    if (t === "contract" || t === "system" || ev.type === "contract") {
+      const id = ev.contractId ?? ev.contract_id ?? ev.contract;
+      if (typeof id === "string" && id.startsWith("C")) contractId = id;
+    }
+  }
+  if (!contractId) {
+    // Fall back to the WASM-scoped key: the ledger exposes it directly.
+    const entries = await server.getLedgerEntries({
+      keys: [{ contractData: { contract: new Address(new Uint8Array(32)), key: { wasm: null }, durability: "persistent" } }],
+    }).catch(() => null);
+    contractId = entries?.entries?.[0]?.contractId ?? null;
+  }
+  if (!contractId) {
+    throw new Error(
+      "the contract was created but its id could not be read back; check the tx on the explorer",
+    );
+  }
+
+  return { contractId, txHashes, uploadTx, createTx };
 }
 
 /**
@@ -289,37 +463,18 @@ export async function deploy({ network: netName, token }) {
   console.log(`  rpc    ${net.rpcUrl}`);
   if (token) console.log(`  asset  ${token}`);
 
-  const out = withIdentity(deployer, (configDir, address) =>
-    run(
-      "stellar",
-      [
-        "contract",
-        "deploy",
-        "--wasm",
-        wasmPath,
-        "--network",
-        netName,
-        // Referenced by address, not by secret: argv is world-readable.
-        "--source-account-id",
-        address,
-        "--config-dir",
-        configDir,
-        "--rpc-url",
-        net.rpcUrl,
-        "--network-passphrase",
-        net.passphrase,
-        ...(token ? ["--", "--token", token] : []),
-      ],
-      { STELLAR_ACCOUNT: address },
-    ),
-  );
+  // The identity is referenced by name, never by key. `--source` accepts an
+// identity, a public key, a secret or a mnemonic; only the name lets the CLI
+// find the key in the keyring to sign with, and it keeps the secret out of argv.
+const { contractId, out } = deployWithCli({ net, wasmPath, token, deployer, netName });
 
   const ids = [...out.matchAll(/C[A-Z2-7]{55}/g)].map((m) => m[0]);
-  const contractId = ids[ids.length - 1];
   const txHashes = [...out.matchAll(/\b[0-9a-f]{64}\b/g)].map((m) => m[0]);
+  if (!ids.length) {
+    throw new Error(`could not read contract id from CLI output:\n${out}`);
+  }
 
-  if (!contractId) throw new Error(`could not read contract id from:\n${out}`);
-  return { contractId, txHashes, deployer: deployer.publicKey(), network: netName };
+  return { contractId: ids[ids.length - 1], txHashes, deployer: deployer.publicKey(), network: netName };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

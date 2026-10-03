@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { getNetwork, fmt } from "./networks.mjs";
 import { loadDeployments } from "./deployments.mjs";
 import { Proved, decimalsOf } from "./chain.mjs";
-import { testnetIdentities } from "./keys.mjs";
+import { testnetIdentities, keypairFor } from "./keys.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, "..");
@@ -40,7 +40,17 @@ rule(`Proved on ${net.label}`);
 line("contract", dep.contractId);
 line("explorer", net.explorerContract(dep.contractId));
 
-const keys = testnetIdentities();
+// A read needs a source account that exists on the target network. Testnet has
+// the committed identities; on mainnet the deployer is the only funded account,
+// so it stands in. Nothing is signed, so the choice affects nothing but whether
+// the ledger can resolve the entry.
+const keys =
+  netName === "mainnet"
+    ? (() => {
+        const d = keypairFor("deployer", "mainnet");
+        return { observer: d, issuer: d, freelancer: d };
+      })()
+    : testnetIdentities();
 const p = new Proved({ net, contractId: dep.contractId, keys });
 
 const token = await p.read("token", {});
