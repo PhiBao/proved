@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import JobPanel from "./JobPanel";
-import { loadJob, networkFromEnv } from "@/lib/proved";
+import { clientConfig, loadJob, networkFromEnv, read } from "@/lib/proved";
+import { jobIdArg, type ClientConfig } from "@/lib/client-config";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,19 @@ export default async function JobPage({
   const { id } = await params;
   const { as } = await searchParams;
   const role = as === "client" ? "client" : "freelancer";
-  const { job, state, decimals } = await loadJob(networkFromEnv(), id);
+  const cfg = clientConfig();
+  const { job, state, decimals } = await loadJob(cfg.network, id);
+
+  // Before any dispute, `challenge_bond` on chain is 0. The card asking "what
+  // does a dispute cost here" must show the minimum the contract would demand,
+  // so read that server-side too — otherwise the page flashes 0.00 and a
+  // screenshot of it is simply wrong.
+  let bondMinimum = job ? BigInt(job.challenge_bond).toString() : null;
+  if (job && BigInt(job.challenge_bond) === 0n) {
+    bondMinimum = await read<string>(cfg.network, "challenge_bond_for", {
+      amount: BigInt(job.amount),
+    }).catch(() => bondMinimum);
+  }
 
   if (!job && state === 0) {
     // Not a missing route: the id may simply not be indexed yet.
@@ -47,7 +60,12 @@ export default async function JobPage({
           switch side
         </Link>
       </div>
-      <JobPanel jobId={id} role={role} initial={{ job, state, decimals }} />
+      <JobPanel
+        jobId={id}
+        role={role}
+        initial={{ job, state, decimals, bondMinimum }}
+        config={clientConfig()}
+      />
     </div>
   );
 }

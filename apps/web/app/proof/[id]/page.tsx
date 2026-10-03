@@ -1,16 +1,6 @@
 import Link from "next/link";
-import {
-  contractId,
-  jobIdArg,
-  loadJob,
-  money,
-  networkConfig,
-  networkFromEnv,
-  normaliseJobId,
-  read,
-  STATE_LABEL,
-  type JobState,
-} from "@/lib/proved";
+import { contractId, loadJob, networkConfig, networkFromEnv, read } from "@/lib/proved";
+import { jobIdArg, money, normaliseJobId, STATE_LABEL, type JobState } from "@/lib/client-config";
 
 export const dynamic = "force-dynamic";
 

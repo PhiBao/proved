@@ -7,18 +7,12 @@
  * anything and can be disabled with `NEXT_PUBLIC_DEMO_MODE=off`.
  */
 import { contract, rpc } from "@stellar/stellar-sdk";
+import type { ClientConfig, JobState } from "./client-config";
+
+export type { ClientConfig, JobState };
+export { STATE_LABEL } from "./client-config";
 
 export type Network = "testnet" | "mainnet";
-
-export type JobState = 0 | 1 | 2 | 3 | 4;
-
-export const STATE_LABEL: Record<JobState, string> = {
-  0: "not found",
-  1: "awaiting delivery",
-  2: "paid",
-  3: "disputed",
-  4: "settled",
-};
 
 export interface NetConfig {
   label: string;
@@ -245,3 +239,32 @@ export async function sha256Hex(text: string): Promise<string> {
 }
 
 export { contract, rpc };
+
+/**
+ * Build the config the browser needs, here on the server where the environment
+ * actually exists. Throws at render time if something is missing, which turns a
+ * misconfiguration into a build error instead of a blank card in production.
+ */
+/** Explorer URL bases, without the functions. */
+function explorerBase(n: Network) {
+  const cfg = networkConfig(n);
+  return {
+    tx: cfg.explorerTx(""),
+    account: cfg.explorerAccount(""),
+    contract: cfg.explorerContract(""),
+  };
+}
+
+export function clientConfig(): ClientConfig {
+  return {
+    network: networkFromEnv(),
+    contractId: contractId(networkFromEnv()),
+    rpcUrl: networkConfig(networkFromEnv()).rpcUrl,
+    passphrase: networkConfig(networkFromEnv()).passphrase,
+    assetCode: networkConfig(networkFromEnv()).assetCode,
+    assetContract: networkConfig(networkFromEnv()).assetContract,
+    explorerTxBase: explorerBase(networkFromEnv()).tx,
+    explorerAccountBase: explorerBase(networkFromEnv()).account,
+    explorerContractBase: explorerBase(networkFromEnv()).contract,
+  };
+}

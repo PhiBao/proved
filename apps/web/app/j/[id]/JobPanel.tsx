@@ -8,16 +8,16 @@
  * product is the absence of one.
  */
 import { useCallback, useEffect, useState } from "react";
+import type { JobState, Wallet } from "@/lib/proved";
 import {
-  getClient,
+  explorerTx,
+  getClientFor,
   jobIdArg,
   money,
-  networkConfig,
-  networkFromEnv,
+  READ_AS,
   sha256Bytes,
-  type JobState,
-  type Wallet,
-} from "@/lib/proved";
+  type ClientConfig,
+} from "@/lib/client-config";
 
 type Job = {
   freelancer: string;
@@ -35,7 +35,14 @@ type Job = {
 interface Props {
   jobId: string;
   role: "client" | "freelancer";
-  initial: { job: Job | null; state: JobState; decimals: number };
+  initial: {
+    job: Job | null;
+    state: JobState;
+    decimals: number;
+    /** What a dispute costs, read server-side. */
+    bondMinimum: string | null;
+  };
+  config: ClientConfig;
 }
 
 const STATUS: Record<JobState, { label: string; cls: string }> = {
@@ -56,8 +63,7 @@ declare global {
   }
 }
 
-export default function JobPanel({ jobId, role, initial }: Props) {
-  const net = networkConfig(networkFromEnv());
+export default function JobPanel({ jobId, role, initial, config: net }: Props) {
   const [job, setJob] = useState<Job | null>(initial.job);
   const [state, setState] = useState<JobState>(initial.state);
   const [decimals, setDecimals] = useState(initial.decimals);
@@ -69,18 +75,17 @@ export default function JobPanel({ jobId, role, initial }: Props) {
   /** Poll chain state, so the screen is never stale and never trusts the server. */
   const refresh = useCallback(async () => {
     try {
-      const c = await getClient(networkFromEnv());
-      const as = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+      const c = await getClientFor(net);
       const [j, s] = await Promise.all([
-        c.job({ id: jobIdArg(jobId) }, { publicKey: as }),
-        c.state({ id: jobIdArg(jobId) }, { publicKey: as }),
+        c.job({ id: jobIdArg(jobId) }, { publicKey: READ_AS }),
+        c.state({ id: jobIdArg(jobId) }, { publicKey: READ_AS }),
       ]);
       setJob((j.result as Job | null) ?? null);
       setState(s.result as JobState);
     } catch {
       /* leave the last known state on screen */
     }
-  }, [jobId, net.rpcUrl, net.passphrase]);
+  }, [jobId, net]);
 
   useEffect(() => {
     const t = setInterval(refresh, 4000);
@@ -111,7 +116,7 @@ export default function JobPanel({ jobId, role, initial }: Props) {
       const wallet = await connect();
       if (!wallet) return;
 
-      const c = await getClient(networkFromEnv());
+      const c = await getClientFor(net);
 
       const tx = await (
         c as unknown as Record<
@@ -145,6 +150,36 @@ export default function JobPanel({ jobId, role, initial }: Props) {
     }
   }
 
+  // Before any dispute, `challenge_bond` is 0 — but this card is asking what a
+  // dispute costs, so it must show the minimum the contract would demand, which
+  // is the number the whole product turns on. Hooks must sit above the early
+  // return below, or they are skipped on the first render.
+  const [bondNow, setBondNow] = useState<string | null>(initial.bondMinimum);
+  useEffect(() => {
+    if (!job) return;
+    const recorded = BigInt(job.challenge_bond);
+    if (recorded > 0n) {
+      setBondNow(recorded.toString());
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const c = await getClientFor(net);
+        const { result } = await c.challenge_bond_for(
+          { amount: BigInt(job.amount) },
+          { publicKey: READ_AS },
+        );
+        if (!cancelled) setBondNow(String(result));
+      } catch (e) {
+        console.warn("bond lookup failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [job, net]);
+
   if (!job) {
     return (
       <div className="card">
@@ -162,6 +197,8 @@ export default function JobPanel({ jobId, role, initial }: Props) {
   const status = STATUS[state];
   const stake = BigInt(job.stake);
   const bond = BigInt(job.challenge_bond);
+  const bondShown = bondNow ?? bond.toString();
+
   const youAreParty = address === you;
   const wrongParty =
     address !== null && !youAreParty
@@ -217,7 +254,7 @@ export default function JobPanel({ jobId, role, initial }: Props) {
         <p className="label mb-2">What a dispute costs here</p>
         <div className="flex items-baseline gap-3">
           <span className="mono text-2xl font-bold" style={{ color: "var(--accent)" }}>
-            {money(bond > 0n ? bond : 0n, decimals)}
+            {money(bondShown, decimals)}
           </span>
           <span className="text-sm" style={{ color: "var(--ink-soft)" }}>
             0.15% of the job
@@ -279,9 +316,7 @@ export default function JobPanel({ jobId, role, initial }: Props) {
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--ink-soft)" }}>
               Something wrong? Contesting costs{" "}
               <strong className="mono" style={{ color: "var(--ink)" }}>
-                {money((BigInt(job.amount) * 15n) / 10_000n < 10n ** BigInt(decimals)
-                  ? 10n ** BigInt(decimals)
-                  : (BigInt(job.amount) * 15n) / 10_000n, decimals)}
+                {money(bondShown, decimals)}
               </strong>
               , posted to the worker if the work turns out to be fine.
             </p>
@@ -341,7 +376,7 @@ export default function JobPanel({ jobId, role, initial }: Props) {
         >
           <p>{note.text}</p>
           {txHash && (
-            <a className="link mono mt-1 block break-all" href={net.explorerTx(txHash)} target="_blank" rel="noreferrer">
+            <a className="link mono mt-1 block break-all" href={explorerTx(net, txHash)} target="_blank" rel="noreferrer">
               {txHash}
             </a>
           )}
