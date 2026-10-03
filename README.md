@@ -5,9 +5,10 @@ why most disputes never happen — the worker who cannot afford to appeal simply
 contesting costs **0.15% of the job amount**, about **$1.80** on a $1,200 job, because on Stellar
 judging costs gas, not a fee.
 
-- **Contract (testnet):** [`CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS`](https://stellar.expert/explorer/testnet/contract/CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS)
-- **Wasm:** `9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31` (15,885 bytes, 15 exported functions)
-- **Tests:** 20/20 `cargo test`
+- **Live on mainnet,** settling in Circle's real USDC: [`CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ`](https://stellar.expert/explorer/mainnet/contract/CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ)
+- **Contract (testnet),** with the full demo history: [`CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS`](https://stellar.expert/explorer/testnet/contract/CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS)
+- **Wasm:** `9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31` (15,885 bytes, 15 exported functions) — the same bytes on both networks, rebuildable
+- **Tests:** 34 `cargo test` — 23 correctness, 11 adversarial · 0 known dependency vulnerabilities · run in CI on every push
 - **Stack:** Rust `soroban-sdk` 28 · Protocol 28 · Next.js 15
 
 ---
@@ -22,6 +23,7 @@ judging costs gas, not a fee.
 - [Business model](#business-model)
 - [Architecture](#architecture)
 - [Reproduce it](#reproduce-it)
+- [Security review](#security-review)
 - [Honest limitations](#honest-limitations)
 - [Sources](#sources)
 
@@ -119,18 +121,56 @@ fn invariant_released_funds_cannot_be_reversed() {
     let _ = w.c.try_confirm(&id);
     let _ = w.c.try_expire(&id);
     let _ = w.c.try_submit(&id, &w.h(2));
-    let _ = w.c.try_open(&id, &f, &c, &twelve_hundred, &cond, &FAR_FUTURE);
+    let _ = w.c.try_open(&id, &f, &c, &w.twelve_hundred(), &cond, &FAR_FUTURE);
 
     assert_eq!(w.c.state(&id), 2);
     assert_eq!(w.bal(&f), fre_after);
     assert_eq!(w.bal(&c), cli_after);
+
+    // Refused for the right reason, not incidentally.
     assert_eq!(fails(w.c.try_challenge(&id, &w.h(1))), Some(Error::WrongState.into()));
+    assert_eq!(
+        fails(w.c.try_submit(&id, &w.h(2))),
+        Some(Error::AlreadyAdjudicated.into())
+    );
+    assert_eq!(fails(w.c.try_expire(&id)), Some(Error::WrongState.into()));
+    assert_eq!(fails(w.c.try_confirm(&id)), Some(Error::WrongState.into()));
 }
 ```
 
 ## Live, on-chain
 
-Every claim above is a transaction that landed. Reproduce the whole thing with one command:
+**It runs on mainnet, against Circle's real USDC.**
+
+| | |
+|---|---|
+| Contract | [`CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ`](https://stellar.expert/explorer/mainnet/contract/CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ) |
+| Settles in | Circle USDC, SAC `CCW67TSZ…JMI75`, derived from the issuer and cross-checked against Horizon |
+| WASM | `9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31` |
+| Testnet | [`CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS`](https://stellar.expert/explorer/testnet/contract/CBK3UQLFJEFXTNXZOXHTLXN2OCGS2POHHH2XHMCXFR7K2RIWVTMEPTMS) |
+
+`pnpm run verify -- --network mainnet` asks the deployed contract what a dispute costs, and gets
+this back from mainnet contract code rather than from a constant in a document:
+
+```
+Proved on Mainnet
+  settlement asset               CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75
+  asset precision                7 decimals
+  on a 1,200.00 job              1200.00 USDC
+  challenge bond                 1.80 USDC   (0.15%, floored at 1.00)
+  Upwork flat fee                337.50 — for anyone, at any amount
+  times cheaper                  188x
+  challenge() on a released job  refuses — state != Open
+  admin key                      none. no upgrade path.
+```
+
+Worth noting what that "7 decimals" is: Stellar's USDC carries **seven** decimals, not six. The
+contract reads the precision from the asset at construction instead of assuming it, which is the only
+reason the same `$5.00` and `$1.00` floors mean the same dollars on testnet's 7-decimal asset and
+mainnet's USDC. Getting that wrong would have silently mispriced every job by an order of magnitude.
+
+Every other claim above is a testnet transaction that landed. Reproduce the whole thing with one
+command:
 
 ```bash
 pnpm install && pnpm run demo:testnet    # funds accounts, mints the asset, runs both paths
@@ -184,7 +224,8 @@ This is not "we added a wallet." Remove the chain and the product collapses to U
 | | |
 |---|---|
 | Network minimum fee | **100 stroops = 0.00001 XLM**, about **$0.0000023** |
-| A full contract deployment, including rent | **0.0108 XLM**, measured |
+| A full contract deployment, testnet | **0.0108 XLM**, measured |
+| The same deployment on mainnet | **21.41 XLM**, measured — mainnet prices resources ~2000× higher |
 | Dispute resolution | the **same** order of magnitude as a transfer |
 | Settlement finality | deterministic, ~5s blocks |
 
@@ -233,7 +274,8 @@ contracts/proved/src/lib.rs        Rust, soroban-sdk 28, wasm32v1-none, 15 expor
   expire()      undelivered jobs sweep after 30s, not fourteen days
   attestation() portable proof, derived from chain state alone
   reputation()  four counters, owned by the worker's account
-src/test.rs                        20 tests; the invariant is one of them
+src/test.rs                        23 correctness tests; the invariant is one of them
+src/adversarial.rs                 11 attacks, named as attacks
 
 apps/web/                          Next.js 15 · React 19 · Tailwind
   /                the pitch and the cost curve
@@ -255,7 +297,8 @@ scripts/
 git clone https://github.com/PhiBao/proved && cd proved
 pnpm install
 pnpm run build:contract      # needs stellar-cli 28.1+ and the wasm32v1-none target
-pnpm run test:contract       # 20 tests
+pnpm run test:contract       # 34 tests: 23 correctness, 11 adversarial
+pnpm run audit               # dependency advisories + adversarial coverage + deployed-hash check
 pnpm run deploy:testnet      # prints a contract id, recorded in deployments.json
 pnpm run sync-env            # writes apps/web/.env.local from deployments.json
 pnpm run demo:testnet        # the full demo, live, with real transaction hashes
@@ -264,25 +307,73 @@ pnpm run dev                 # the web app on :3000
 ```
 
 **Mainnet.** Set `STELLAR_RPC_MAINNET` (Soroban RPC is not free-public; QuickNode, Alchemy, Ankr,
-Validation Cloud and Chainstack all work), export `DEPLOYER_SECRET` for an account holding at least
-2 XLM, then `pnpm run deploy:mainnet`. A preflight refuses before touching the network if the
-deployer does not exist, is underfunded, or if the derived USDC contract does not match what the
-ledger reports. The settlement asset is Circle's USDC, derived from its issuer — never hard-coded.
+Validation Cloud and Chainstack all work), export `DEPLOYER_SECRET` for an account holding about **24 XLM**, then `pnpm run deploy:mainnet`.
+
+That figure is not a guess. Mainnet prices Soroban resources about **2000×** above testnet: the same
+15,885-byte WASM costs **21.41 XLM** to upload there against **0.0108 XLM** on testnet. A preflight
+simulates an upload of the real WASM against the target network and reads the resource fee the node
+itself quotes, then refuses before touching the network if the balance is short — because a floor
+copied from the cheap network is worse than no floor, as we found the hard way.
+
+The settlement asset is Circle's USDC, derived from its issuer and cross-checked against Horizon's
+reported `contract_id` — never hard-coded, because a wrong constant would point every payment at the
+wrong contract and fail silently.
 
 **Testnet keys are committed on purpose.** They are derived from public hard-coded seeds, hold no
 value, and let a judge reproduce every number above without asking anyone for a secret. Mainnet keys
 are only ever read from the environment.
 
+## Security review
+
+`pnpm run audit` — the whole thing, re-runnable, and run in CI on every push:
+
+```
+1. Dependency advisories
+   ✓ 0 known vulnerabilities in 418 dependencies
+   ✓ no unmaintained crates
+2. What the contract can actually do
+   ✓ no admin, owner, upgrade or migration entry point in the source
+   ✓ 4 require_auth() call sites — parties cannot act alone
+3. Invariants
+   ✓ 34 passed
+4. Adversarial coverage
+   ✓ every public function appears in the adversarial surface
+   ✓ tested WASM sha256 9186424a… matches the mainnet deployment
+```
+
+The one unmaintained crate in the tree, `paste`, is a proc-macro reached through `ark-ff`; its
+symbols are absent from the shipped WASM, so it contributes no code. Stated rather than hidden.
+
+`src/adversarial.rs` holds eleven attacks, each named as the attack rather than the defence, so
+coverage reads against the contract's public surface: every route out of both terminal states, sweep
+abuse, adjudication single-shot, challenge single-shot, replay, degenerate amounts, unknown-id reads,
+and the bond's bounds. Two of the tests exist to fail when the coverage itself rots — one checks the
+surface list names real functions, the other checks every `pub fn` is in it, so a function added
+later without an attack breaks the build.
+
+The CI job that matters rebuilds the WASM from a clean checkout and fails if it differs from the
+hash deployed on mainnet. "The tests pass" and "the deployed contract is the tested contract" stop
+being two claims a reader has to take on faith.
+
 ## Honest limitations
 
-- **Testnet, and not audited.** The reference implementations of Stellar's confidential-token and
-  privacy-pool work are also testnet-only and unaudited; we are in the same category and say so.
+- **Not audited by a human.** What we have is an automated review and 34 tests, run in CI, plus
+  coverage that fails when it lapses. That is evidence, not assurance.
+- **The `$1.00` floor means small jobs cannot be disputed.** Below about **$10** the floor is a large
+  enough share of the job that contesting stops being worth it — at $1 the bond is the entire job
+  amount. It exists so a challenge cannot cost less than the gas it burns, and it is the price of
+  that. The test suite pins the boundary rather than leaving a judge to discover it. **Proved is for
+  jobs above ~$10, not for micropayments**, which is a narrower claim than we would like.
+- **We prove identity, not quality.** The contract sees a hash, never the content. It proves the
+  delivered artifact is byte-for-byte what was contracted — which is why the commitment is pinned
+  before funding — and it cannot tell a good deliverable from a bad one. That is exactly why the
+  dispute path exists rather than being a failure of it.
+- **A first-time freelancer locks 3% of the job.** `$36.00` on a `$1,200` job. The stake is locked,
+  not spent — a verified release returns it — but it is real friction for someone with no history,
+  and it is the honest cost of making them fundable at all.
 - **The testnet settlement asset is our own**, a 7-decimal classic asset, so the demo never depends
   on a third-party faucet. The dollar figures are identical to what real USDC produces because the
   contract reads the asset's own precision. Mainnet settles in Circle's USDC.
-- **Delivering requires a real file.** The UI hashes what you hand over and compares it to the
-  funding-time commitment. That models a digital deliverable; it does not model subjective
-  quality, which is exactly why the dispute path still has to exist.
 - **Job creation in the browser needs two signatures**, which one wallet cannot produce, so the web
   app's demo mode shells out to the committed testnet keys. It is refused outright on mainnet.
 - **Not a payments company.** We compete on the cost of disagreement, not on transfer fees. If
