@@ -71,6 +71,22 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm --dir apps/web install --frozen-lockfile
 
+      # The npm package is only the driver; the browser binary it drives is a
+      # separate download, so a fresh runner has no Chromium and the diagram
+      # check fails with "Executable doesn't exist" rather than anything wrong
+      # with the diagram. Headless shell only: the full Chromium needs system
+      # libraries this runner does not have, and nothing here needs a headed
+      # browser. Cached on the lockfile, so the Playwright version pins the
+      # binary it gets.
+      - name: Cache the headless browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install the headless browser
+        run: pnpm exec playwright install --only-shell chromium
+
       # NEXT_PUBLIC_* values are inlined at build time and fail silently when
       # absent, so a build without them produces an app that serves 200 and shows
       # nothing. sync-env derives them from deployments.json.
