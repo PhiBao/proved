@@ -3,14 +3,25 @@ import { JobIdField } from "@/components/JobIdField";
 
 export const dynamic = "force-dynamic";
 
-/** Freelancer entry point: paste the job id you were sent. */
+/**
+ * Freelancer entry point: paste the job id you were sent.
+ *
+ * The network travels with the id, for the same reason as on /proof: a job id is
+ * scoped to one chain, so a link that dropped the network resolved to nothing.
+ */
 export default async function Work({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string }>;
+  searchParams: Promise<{ id?: string; net?: string }>;
 }) {
-  const { id } = await searchParams;
-  if (id) redirect(`/j/${id}?as=freelancer`);
+  const { id, net } = await searchParams;
+
+  // Whitelisted rather than reflected: this string reaches a redirect target.
+  const network = net === "mainnet" || net === "testnet" ? net : null;
+
+  if (id) {
+    redirect(`/j/${id}?as=freelancer${network ? `&net=${network}` : ""}`);
+  }
 
   return (
     <div className="space-y-4">
@@ -22,7 +33,7 @@ export default async function Work({
           over your file, and if it matches what they committed to you are paid — immediately, and
           with no window in which they can change their mind.
         </p>
-        <form action="/work" className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <form action="/work">
           <JobIdField
             id="wid"
             label="Job id from your link"

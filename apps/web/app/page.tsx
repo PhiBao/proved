@@ -78,13 +78,9 @@ export default function Home() {
             I&apos;m the one doing the work
           </Link>
         </div>
-        <form action="/proof" className="card flex flex-col gap-3 sm:flex-row sm:items-end">
+        <form action="/proof" className="card">
           <JobIdField label="Already have a job id? Look up its proof" />
         </form>
-        <p className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          Pre-filled with a job that has actually settled, so you can press the button without
-          inventing a 64-character hash. Paste over it to look up your own.
-        </p>
       </section>
 
       {/* ---------------------------------------------------------- proof -- */}
