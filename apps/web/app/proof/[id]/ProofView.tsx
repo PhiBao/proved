@@ -109,9 +109,11 @@ function Proof({ id }: { id: string }) {
           <strong>{network}</strong>. Job ids are per-network, so a testnet id will not resolve
           here — try the switch in the header.
         </p>
-        <Link href="/" className="btn btn-ghost inline-block">
-          Home
-        </Link>
+        <div className="flex justify-center pt-1">
+          <Link href="/" className="btn btn-ghost">
+            Home
+          </Link>
+        </div>
       </div>
     );
   }
@@ -124,9 +126,11 @@ function Proof({ id }: { id: string }) {
           The contract read failed. The RPC endpoint may be down, or no contract is deployed on this
           network.
         </p>
-        <Link href="/" className="btn btn-ghost inline-block">
-          Home
-        </Link>
+        <div className="flex justify-center pt-1">
+          <Link href="/" className="btn btn-ghost">
+            Home
+          </Link>
+        </div>
       </div>
     );
   }

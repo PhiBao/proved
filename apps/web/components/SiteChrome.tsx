@@ -64,15 +64,18 @@ export function NetworkSwitch({ configs }: { configs: Record<string, ClientConfi
         </svg>
       </summary>
 
+      {/* Padding on the panel rather than margins on the items: margins collapse
+          through the container's edges, so the first item sat flush against the
+          border and the last was clipped by the rounding. */}
       <div
-        className="absolute right-0 z-20 mt-1.5 w-64 overflow-hidden rounded-lg border"
+        className="absolute right-0 z-20 mt-2 w-64 rounded-lg border p-1.5"
         style={{
           background: "var(--card)",
           borderColor: "var(--line)",
           boxShadow: "0 10px 28px rgba(0,0,0,.16)",
         }}
       >
-        {NETWORKS.map((n) => {
+        {NETWORKS.map((n, i) => {
           const cfg = configs[n];
           const ready = Boolean(cfg?.contractId);
           const active = n === network;
@@ -86,10 +89,11 @@ export function NetworkSwitch({ configs }: { configs: Record<string, ClientConfi
                 e.currentTarget.closest("details")?.removeAttribute("open");
                 setNetwork(n);
               }}
-              className="block w-full cursor-pointer border-0 px-3.5 py-2.5 text-left"
+              className="block w-full cursor-pointer rounded-md border-0 px-3 py-2.5 text-left"
               style={{
                 background: active ? "var(--paper)" : "transparent",
-                borderTop: "1px solid var(--line)",
+                borderTop: i === 0 ? "none" : "1px solid var(--line)",
+                borderRadius: "6px",
                 textAlign: "left",
               }}
               aria-current={active}
