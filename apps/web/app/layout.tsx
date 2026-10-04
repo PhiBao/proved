@@ -36,7 +36,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   paid on proof
                 </span>
               </Link>
-              <NetworkSwitch configs={configs} />
+              <div className="flex items-center gap-4">
+                <nav className="hidden items-center gap-4 text-sm sm:flex" aria-label="Primary">
+                  <Link
+                    href="/j/new"
+                    className="font-medium underline-offset-4 hover:underline"
+                    style={{ color: "var(--ink-soft)" }}
+                  >
+                    Post a job
+                  </Link>
+                  <Link
+                    href="/work"
+                    className="font-medium underline-offset-4 hover:underline"
+                    style={{ color: "var(--ink-soft)" }}
+                  >
+                    Do the work
+                  </Link>
+                </nav>
+                <NetworkSwitch configs={configs} />
+              </div>
             </div>
           </header>
 
