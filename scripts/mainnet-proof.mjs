@@ -24,8 +24,19 @@ function line(k, v) {
   console.log(`  ${k.padEnd(26)} ${v}`);
 }
 
-const flag = (n) => process.argv.includes(n) && process.argv[process.argv.indexOf(n) + 1];
-const netName = flag("--network") ?? "mainnet";
+// This script defaults to mainnet, which `networkName()` does not: that helper
+// defaults to STELLAR_NETWORK, which is testnet in the local environment. The
+// previous local parser was worse — a missing flag made it `false`, and
+// `false ?? "mainnet"` is `false`, not `"mainnet"`, so `pnpm run proof` failed
+// with `unknown network "false"` unless --network was passed explicitly.
+// `??` falls through on null and undefined, never on false.
+const flagIndex = process.argv.indexOf("--network");
+const netName =
+  (flagIndex !== -1 && process.argv[flagIndex + 1]?.startsWith("mainnet")
+    ? "mainnet"
+    : flagIndex !== -1 && process.argv[flagIndex + 1]
+      ? process.argv[flagIndex + 1]
+      : "mainnet");
 const net = getNetwork(netName);
 const dep = loadDeployments()[netName];
 if (!dep?.contractId) {
