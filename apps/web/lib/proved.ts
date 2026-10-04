@@ -72,11 +72,22 @@ export function networkFromEnv(): Network {
 /** Upwork's flat arbitration fee, in whole units. The number we exist to beat. */
 export const UPWORK_FLAT_FEE_USD = 337n;
 
-/** A client's browser wallet. Kept to the two methods we actually use. */
+/**
+ * A client's browser wallet, in the SEP-43 shape Freighter speaks and the SDK
+ * accepts. The previous declaration had `signTransaction` returning a bare
+ * string; the real contract is `{ signedTxXdr, signerAddress }`, and declaring
+ * it wrong meant a signing failure surfaced far from its cause.
+ */
 export interface Wallet {
-  publicKey: string;
-  signTransaction: (tx: string) => Promise<string>;
-  signAuthEntry?: (entry: string) => Promise<string>;
+  address: string;
+  signTransaction: (
+    xdr: string,
+    opts?: { networkPassphrase?: string; address?: string },
+  ) => Promise<{ signedTxXdr: string; signerAddress: string }>;
+  signAuthEntry?: (
+    entry: string,
+    opts?: { networkPassphrase?: string; address?: string },
+  ) => Promise<{ signedAuthEntry: string | null; signerAddress: string }>;
 }
 
 /** Options every generated method accepts. */
