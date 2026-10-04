@@ -115,10 +115,21 @@ jobs:
       # exactly and is asserted; the executable hash is reported rather than
       # asserted, because they legitimately differ — the deployment predates the
       # toolchain pin. See deployments.json's `provenance` field for the detail.
+      #
+      # Skipped without credentials rather than failed: a CI runner must not
+      # hold a provider key, and the RPC URL carries quota. The same comparison
+      # runs locally via `pnpm run abi`, and inside `pnpm run check` whenever
+      # the variables are present — so a skipped CI run is a visible warning,
+      # not a silent pass.
       - name: Deployed mainnet contract matches this source
         run: |
-          pnpm run abi
-          grep -q "ABI match           yes" <<< "$(pnpm --silent run abi)" \
+          if [ -z "${STELLAR_RPC_MAINNET:-}" ]; then
+            echo "::warning::no mainnet RPC configured; skipping the live comparison (run pnpm run abi locally)"
+            exit 0
+          fi
+          out="$(pnpm --silent run abi)"
+          printf '%s\n' "$out"
+          grep -q "ABI match           yes" <<< "$out" \
             || { echo "::error::mainnet's exported interface differs from this build"; exit 1; }
 
       - name: Tests
