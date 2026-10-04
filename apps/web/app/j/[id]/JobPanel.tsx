@@ -8,8 +8,10 @@
  * product is the absence of one.
  */
 import { useCallback, useEffect, useState } from "react";
-import type { JobState, Wallet } from "@/lib/proved";
+import type { JobState } from "@/lib/proved";
 import { useNetwork } from "@/lib/network-context";
+import { useWallet, type ConnectedWallet } from "@/lib/wallet-context";
+import { WalletButton } from "@/components/WalletButton";
 import {
   explorerTx,
   getClientFor,
@@ -53,22 +55,12 @@ const STATUS: Record<JobState, { label: string; cls: string }> = {
   4: { label: "settled", cls: "pill-open" },
 };
 
-/** A wallet provider that follows the standard Stellar browser interface. */
-declare global {
-  interface Window {
-    freighter?: {
-      signTransaction: (tx: string, opts?: object) => Promise<string>;
-      getPublicKey: () => Promise<string>;
-    };
-  }
-}
-
 export default function JobPanel({ jobId, role, configs }: Props) {
   const { network, config: net } = useNetwork();
   const [job, setJob] = useState<Job | null>(null);
   const [state, setState] = useState<JobState>(0);
   const [decimals, setDecimals] = useState(7);
-  const [address, setAddress] = useState<string | null>(null);
+  const { address, ensureConnected } = useWallet();
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -105,28 +97,12 @@ export default function JobPanel({ jobId, role, configs }: Props) {
     return () => clearInterval(t);
   }, [refresh]);
 
-  async function connect(): Promise<Wallet | null> {
-    if (!window.freighter) {
-      setNote({
-        kind: "bad",
-        text: "No browser wallet found. Install Freighter for testnet, or open a job from /j/new in demo mode.",
-      });
-      return null;
-    }
-    const publicKey = await window.freighter.getPublicKey();
-    setAddress(publicKey);
-    return {
-      publicKey,
-      signTransaction: (tx: string) => window.freighter!.signTransaction(tx, { alwaysPrompt: false }),
-    };
-  }
-
   /** Run a contract method: build, sign, send, then show the real tx hash. */
   async function act(method: string, args: Record<string, unknown>, label: string) {
     setBusy(method);
     setNote(null);
     try {
-      const wallet = await connect();
+      const wallet: ConnectedWallet | null = await ensureConnected();
       if (!wallet) return;
 
       const c = await getClientFor(net);
@@ -142,7 +118,7 @@ export default function JobPanel({ jobId, role, configs }: Props) {
           }>
         >
       )[method](args, {
-        publicKey: wallet.publicKey,
+        publicKey: wallet.address,
         networkPassphrase: net.passphrase,
         signTransaction: wallet.signTransaction,
       });
@@ -208,7 +184,7 @@ export default function JobPanel({ jobId, role, configs }: Props) {
       const res = await fetch("/api/demo/act", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, id: jobId, ...extra }),
+        body: JSON.stringify({ action, id: jobId, network, ...extra }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error ?? "the contract refused this");
@@ -311,7 +287,10 @@ export default function JobPanel({ jobId, role, configs }: Props) {
 
       {/* --------------------------------------------------------- actions -- */}
       <div className="card space-y-3">
-        <p className="label">You are the {isClient ? "payer" : "worker"}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="label">You are the {isClient ? "payer" : "worker"}</p>
+          <WalletButton compact />
+        </div>
 
         {address && (
           <p className="mono text-[13px]" style={{ color: "var(--ink-soft)" }}>

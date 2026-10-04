@@ -15,6 +15,7 @@
  */
 import { useState } from "react";
 import { useNetwork } from "@/lib/network-context";
+import { WalletButton } from "@/components/WalletButton";
 
 export function PostJobForm() {
   const { network, config } = useNetwork();
@@ -50,6 +51,7 @@ export function PostJobForm() {
           description: spec ?? fd.get("description"),
           amount: fd.get("amount"),
           worker: fd.get("worker"),
+          network,
           // Sent only when a real file was chosen; otherwise the server hashes
           // the description, which is weaker and labelled as such on the job.
           ...(digest ? { condition: digest } : {}),
@@ -153,8 +155,34 @@ export function PostJobForm() {
         </div>
       </div>
 
-      <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-        {busy ? "Signing two transactions on chain…" : "Fund it"}
+      <div className="card space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="label">Wallet</p>
+          <WalletButton compact />
+        </div>
+        {network === "testnet" ? (
+          <p className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+            Testnet posting uses the demo custodian, so a wallet is optional here. Real
+            signatures still need one on the job screen.
+          </p>
+        ) : (
+          <p className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+            Mainnet posting needs both the payer and the worker to sign. A connected wallet
+            covers your side; this form does not yet collect the other side&apos;s signature.
+          </p>
+        )}
+      </div>
+
+      <button
+        type="submit"
+        className="btn btn-primary w-full"
+        disabled={busy || network !== "testnet"}
+      >
+        {busy
+          ? "Signing two transactions on chain…"
+          : network === "testnet"
+            ? "Fund it"
+            : "Demo funding is testnet-only"}
       </button>
 
       {err && (
@@ -171,8 +199,9 @@ export function PostJobForm() {
           </>
         ) : (
           <>
-            Mainnet: the demo custodian is deliberately disabled, so this button cannot fund for
-            real. The contract is live — see the job page with a wallet connected.
+            Mainnet: the demo custodian is deliberately disabled. Connect a wallet to act on an
+            existing mainnet job; posting a new two-party job from the browser is not supported
+            yet.
           </>
         )}{" "}
         <span className="mono">{config.contractId ? `${config.contractId.slice(0, 10)}…` : "—"}</span>

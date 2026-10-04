@@ -31,23 +31,27 @@ function need(name: string): string {
 }
 
 export async function POST(req: Request) {
-  if (process.env.NEXT_PUBLIC_NETWORK === "mainnet") {
-    return NextResponse.json(
-      { error: "the demo custodian is disabled on mainnet — fund with a real wallet" },
-      { status: 403 },
-    );
-  }
 
   const hex = (u: Uint8Array) =>
     [...u].map((b) => b.toString(16).padStart(2, "0")).join("");
   const hexToBytes = (h: string) =>
     new Uint8Array(h.match(/../g)!.map((b) => parseInt(b, 16)));
 
-  let body: { description?: string; amount?: string; condition?: string };
+  let body: { description?: string; amount?: string; condition?: string; network?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad json" }, { status: 400 });
+  }
+
+  // The route only holds testnet keys and only talks to testnet. Refusing any
+  // other requested network prevents a mainnet view from silently creating a
+  // testnet job.
+  if (body.network !== "testnet" || process.env.NEXT_PUBLIC_NETWORK === "mainnet") {
+    return NextResponse.json(
+      { error: "the demo custodian is testnet-only — fund mainnet with a real wallet" },
+      { status: 403 },
+    );
   }
 
   const description = String(body.description ?? "").trim();

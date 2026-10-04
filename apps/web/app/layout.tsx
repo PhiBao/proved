@@ -3,7 +3,9 @@ import Link from "next/link";
 import "./globals.css";
 import { allClientConfigs } from "@/lib/proved";
 import { NetworkProvider } from "@/lib/network-context";
+import { WalletProvider } from "@/lib/wallet-context";
 import { Mark, NetworkSwitch, SiteFooter } from "@/components/SiteChrome";
+import { WalletButton } from "@/components/WalletButton";
 
 export const metadata: Metadata = {
   title: "Proved — paid on proof",
@@ -27,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-dvh">
         <NetworkProvider configs={configs}>
+          <WalletProvider>
           <header className="border-b" style={{ borderColor: "var(--line)" }}>
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-5 py-4">
               <Link href="/" className="flex items-baseline gap-2">
@@ -53,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     Do the work
                   </Link>
                 </nav>
+                <WalletButton compact />
                 <NetworkSwitch configs={configs} />
               </div>
             </div>
@@ -61,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="mx-auto max-w-3xl px-5 pb-24 pt-8">{children}</main>
 
           <SiteFooter />
+          </WalletProvider>
         </NetworkProvider>
       </body>
     </html>

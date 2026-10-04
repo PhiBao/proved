@@ -26,12 +26,6 @@ function need(name: string): string {
 }
 
 export async function POST(req: Request) {
-  if (process.env.NEXT_PUBLIC_NETWORK === "mainnet") {
-    return NextResponse.json(
-      { error: "demo mode is disabled on mainnet" },
-      { status: 403 },
-    );
-  }
 
   let body: {
     action?: string;
@@ -39,11 +33,19 @@ export async function POST(req: Request) {
     description?: string;
     reason?: string;
     artifact?: string;
+    network?: string;
   };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "bad json" }, { status: 400 });
+  }
+
+  // The route only holds testnet keys and only talks to testnet. The job screen
+  // sends the network it is viewing, so a request from a mainnet view is
+  // refused rather than applied to the wrong chain.
+  if (body.network !== "testnet" || process.env.NEXT_PUBLIC_NETWORK === "mainnet") {
+    return NextResponse.json({ error: "demo mode is testnet-only" }, { status: 403 });
   }
 
   const { action, id } = body;
