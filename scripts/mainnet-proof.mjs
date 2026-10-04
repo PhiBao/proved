@@ -198,7 +198,14 @@ rule("What this does and does not show");
 
 line("shows", `the contract is live on ${net.label} against ${code}`);
 line("", "the economics are computed by that deployed code");
-line("", "the WASM is byte-identical to the tested testnet build");
+// The hash claim here used to be that the deployed WASM was byte-identical to
+// the tested build. It is not: mainnet runs 9186424a… and this tree builds
+// a746a700…. The contract source is unchanged except for #[cfg(test)] modules
+// (verified to compile to identical bytes) and the deployed contract's exported
+// interface is identical to this build's. So the honest line names what is
+// actually checked, and points at the command that checks it.
+line("", "the exported interface is identical to this build's — pnpm run abi");
+line("", "the executable hash differs: 9186424a… deployed, a746a700… built");
 line("does not", "move money — reads only, no balance required of anyone");
 console.log();
 if (netName === "mainnet") {
