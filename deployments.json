@@ -17,7 +17,7 @@
     "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
     "assetCode": "USDC",
     "issuer": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
-    "showcaseJob": "",
+    "showcaseJob": "321d4ddb16e5eec47a79d00ec6a4ea6d79244cecb52369dcdbae6ffe68da0411",
     "recordedAt": "2026-10-03T19:00:31.805Z",
     "note": "Bound to Circle-issued USDC. Stellar's USDC carries 7 decimals, and the contract reads that from the asset at init rather than assuming.",
     "wasmSha256": "9186424a90a0e933d45642f5f5d3e4f748763fbe9960562cc4c5541ebe337f31",
