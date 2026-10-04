@@ -4,8 +4,8 @@
  * Why a build step for one diagram: a hand-drawn picture of a state machine is a
  * picture of a state machine as of the moment it was drawn. This one is generated
  * from `docs/architecture.mmd`, and `pnpm run diagram:check` fails if the
- * committed SVG is stale — so the diagram cannot quietly disagree with the
- * contract it depicts.
+ * committed SVG's content is stale — so the diagram cannot quietly disagree with
+ * the contract it depicts.
  *
  * Mermaid ships as an ES module only, so it cannot be pulled in with
  * `addScriptTag` and a global. The page is therefore served over HTTP from a
@@ -145,9 +145,56 @@ const existing = (() => {
 // successful generate, every time.
 const expected = responsive + "\n";
 
+/**
+ * The diagram's visible text, which is what --check compares.
+ *
+ * A byte comparison cannot work here: Mermaid measures text with the machine's
+ * fonts, so two machines render different coordinates for the same .mmd — the
+ * viewBox alone differed by 46px between this machine and a bare Ubuntu, which
+ * failed CI on a file nobody had touched. Comparing bytes would punish every
+ * machine whose fonts differ from the author's.
+ *
+ * What the check is for is content drift — a renamed state, a new edge, a
+ * deleted label — and all of that shows up in the text. Coordinates,
+ * stylesheets and font metrics do not, so they are not compared.
+ */
+function visibleText(svg) {
+  return svg
+    .replace(/<style[\s\S]*?<\/style>/g, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(
+      /&(amp|lt|gt|quot|apos);/g,
+      (_, n) => ({ amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" })[n],
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Where two texts first diverge, for the error message. */
+function divergence(a, b) {
+  const wa = a.split(" ");
+  const wb = b.split(" ");
+  const i = wa.findIndex((w, k) => w !== wb[k]);
+  const at = Math.max(0, i - 4);
+  return {
+    committed: wa.slice(at, i + 8).join(" "),
+    rendered: wb.slice(at, i + 8).join(" "),
+  };
+}
+
 if (check) {
-  if (existing !== expected) {
+  if (existing === null) {
+    console.error("docs/architecture.svg is missing — run: pnpm run diagram");
+    process.exit(1);
+  }
+  const want = visibleText(responsive);
+  const have = visibleText(existing);
+  if (have !== want) {
+    const d = divergence(have, want);
     console.error("docs/architecture.svg is stale — run: pnpm run diagram");
+    console.error(`  committed: …${d.committed}…`);
+    console.error(`  rendered:  …${d.rendered}…`);
     process.exit(1);
   }
   console.log("docs/architecture.svg is up to date");

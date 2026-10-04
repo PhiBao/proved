@@ -141,8 +141,12 @@ jobs:
           pnpm run audit
 
       # The architecture diagram is generated from docs/architecture.mmd. This
-      # fails when the committed SVG is out of date, so the picture in the README
-      # cannot drift away from the state machine it depicts.
+      # fails when the committed SVG's content is out of date, so the picture in
+      # the README cannot drift away from the state machine it depicts.
+      # It compares the diagram's visible text, deliberately not bytes: Mermaid
+      # measures text with the machine's fonts, so two machines render different
+      # coordinates for the same .mmd. A byte comparison failed CI on machines
+      # that had touched nothing.
       - name: Architecture diagram is current
         run: pnpm run diagram:check
 
