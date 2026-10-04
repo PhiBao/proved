@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import { clientConfig } from "@/lib/proved";
-
+import { PostJobForm } from "./PostJobForm";
 export const dynamic = "force-dynamic";
 
 export default async function NewJob({
@@ -9,8 +8,6 @@ export default async function NewJob({
   searchParams: Promise<{ id?: string }>;
 }) {
   const { id } = await searchParams;
-  const cfg = clientConfig();
-  const n = cfg.network;
 
   // A server action posted the job and handed us its id.
   if (id) redirect(`/j/${id}?as=client`);
@@ -26,7 +23,7 @@ export default async function NewJob({
           back. That is the trade, and it is why they will work for someone they have never met.
         </p>
 
-        <PostJobForm network={n} contractId={cfg.contractId} />
+        <PostJobForm />
       </div>
 
       <details className="card">
@@ -43,5 +40,3 @@ export default async function NewJob({
     </div>
   );
 }
-
-import { PostJobForm } from "./PostJobForm";

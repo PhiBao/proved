@@ -12,6 +12,9 @@
   --accent-soft: #e6f2ec;
   --warn: #9a3412;
   --warn-soft: #fdf0e8;
+  /* Brand ink, used by the favicon and the mark so the two cannot drift. */
+  --brand: #f0a868;
+  --brand-deep: #0d0b09;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -25,6 +28,8 @@
     --accent-soft: #10281e;
     --warn: #fb923c;
     --warn-soft: #2a1a10;
+    --brand: #f0a868;
+    --brand-deep: #0d0b09;
   }
 }
 

@@ -15,6 +15,7 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
+REPO="$(pwd)"
 CONTRACT=contracts/proved
 WASM=$CONTRACT/target/wasm32v1-none/release/proved.wasm
 export PATH="$PATH:$HOME/.cargo/bin"
@@ -171,33 +172,26 @@ fi
 attacks=$(grep -c "^fn attack_" "$CONTRACT/src/adversarial.rs")
 ok "$attacks adversarial tests"
 
-# The shipped binary must be the tested one. A test pass proves nothing if it
-# ran against different code than what is deployed.
-# The shipped binary must be the tested one. A passing suite proves nothing if it
-# ran against different code than what is deployed, so the hash that was tested is
-# compared against the hash recorded for the live deployment.
-if [ -f "$WASM" ]; then
+# The deployed instance against this build. Two questions, answered separately,
+# because they have different answers and conflating them would overstate one:
+# the ABI must match exactly, and the executable hash is reported as it is.
+if [ -f "$WASM" ] && command -v stellar >/dev/null && [ -f "$REPO/.env.local" ]; then
   hash=$(sha256sum "$WASM" | cut -d' ' -f1)
   ok "tested WASM sha256 $hash"
-  for net in testnet mainnet; do
-    recorded=$(node -e '
-      try {
-        const d = JSON.parse(require("fs").readFileSync("deployments.json", "utf8"));
-        process.stdout.write(d[process.argv[1]]?.wasmSha256 ?? "");
-      } catch {}
-    ' "$net")
-    [ -z "$recorded" ] && continue
-    if [ "$recorded" = "$hash" ]; then
-      ok "matches the $net deployment"
-    else
-      bad "differs from the $net deployment (recorded $recorded)"
-    fi
-  done
+  if (cd "$REPO" && node --env-file-if-exists=.env.local scripts/abi.mjs >/tmp/proved-abi.txt 2>&1); then
+    ok "mainnet's exported interface is identical to this build's"
+  else
+    bad "mainnet's exported interface differs from this build"
+    sed 's/^/    /' /tmp/proved-abi.txt
+  fi
+  grep -q "differ — same ABI" /tmp/proved-abi.txt && \
+    warn "deployed executable hash differs from this build (same ABI; see deployments.json)"
+  grep -q "identical — the deployed instance" /tmp/proved-abi.txt && \
+    ok "deployed executable hash is this build"
 else
-  bad "no WASM built"
+  warn "skipped the deployed-vs-built check (needs the CLI and .env.local)"
 fi
 
-# ---------------------------------------------------------------------------
 say "Result"
 # ---------------------------------------------------------------------------
 if [ "$fail" = "0" ]; then

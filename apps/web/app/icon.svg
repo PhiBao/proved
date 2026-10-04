@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    The same glyph as components/SiteChrome.tsx: a check that has crossed a line.
+    Kept as a file rather than generated because next/og has to download a font at
+    build time to draw a character, and it fails the whole build when it cannot.
+    A path needs nothing.
+  -->
+  <rect width="32" height="32" rx="7" fill="#0d0b09"/>
+  <path d="M7 16.5l4.5 4.5L16 10" fill="none" stroke="#8b7f70" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M17 21.5l2.5 2.5L26 12" fill="none" stroke="#f0a868" stroke-width="2.8"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

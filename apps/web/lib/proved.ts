@@ -256,16 +256,59 @@ function explorerBase(n: Network) {
   };
 }
 
+/**
+ * Build the browser config for one network.
+ *
+ * Takes the network as an argument rather than reading it from the
+ * environment, because the site can now show either. `NEXT_PUBLIC_NETWORK` only
+ * decides which one is the default.
+ */
+export function clientConfigFor(n: Network): ClientConfig {
+  // A network whose environment is not configured degrades to an empty config
+  // rather than throwing.
+  //
+  // This is load-bearing, not defensive decoration: `allClientConfigs` resolves
+  // both networks at module scope so the switcher can offer both, and mainnet
+  // needs RPC and USDC variables that a fresh deployment does not have. Throwing
+  // here took the whole build down with "next build exited with 1" before the
+  // first page rendered. A network that is not configured should appear as
+  // unavailable in the switcher, which is a truthful answer.
+  try {
+    const cfg = networkConfig(n);
+    const base = explorerBase(n);
+    return {
+      network: n,
+      contractId: contractId(n),
+      rpcUrl: cfg.rpcUrl,
+      passphrase: cfg.passphrase,
+      assetCode: cfg.assetCode,
+      assetContract: cfg.assetContract,
+      explorerTxBase: base.tx,
+      explorerAccountBase: base.account,
+      explorerContractBase: base.contract,
+    };
+  } catch (e) {
+    return {
+      network: n,
+      contractId: "",
+      rpcUrl: "",
+      passphrase: "",
+      assetCode: n === "mainnet" ? "USDC" : "PUSD",
+      assetContract: "",
+      explorerTxBase: "",
+      explorerAccountBase: "",
+      explorerContractBase: "",
+      unconfigured: (e as Error).message,
+    };
+  }
+}
+
+/** The default network's config. Kept so existing call sites keep working. */
 export function clientConfig(): ClientConfig {
-  return {
-    network: networkFromEnv(),
-    contractId: contractId(networkFromEnv()),
-    rpcUrl: networkConfig(networkFromEnv()).rpcUrl,
-    passphrase: networkConfig(networkFromEnv()).passphrase,
-    assetCode: networkConfig(networkFromEnv()).assetCode,
-    assetContract: networkConfig(networkFromEnv()).assetContract,
-    explorerTxBase: explorerBase(networkFromEnv()).tx,
-    explorerAccountBase: explorerBase(networkFromEnv()).account,
-    explorerContractBase: explorerBase(networkFromEnv()).contract,
-  };
+  return clientConfigFor(networkFromEnv());
+}
+
+/** Both networks, so the client can switch without a server round trip. */
+export function allClientConfigs(): Record<Network, ClientConfig> {
+  return { testnet: clientConfigFor("testnet"), mainnet: clientConfigFor("mainnet") };
 }

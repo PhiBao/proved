@@ -208,7 +208,11 @@ async function main() {
 
   rule("Done");
   line("contract", contractId);
-  line("jobs", `${Buffer.from(jobA).toString("hex").slice(0, 16)}… , ${Buffer.from(jobB).toString("hex").slice(0, 16)}…`);
+  // Full ids, not truncated. The truncation was fine when this was only for the
+  // eye, but these ids are copied into the site's pre-filled job field and the
+  // README, where 16 characters is a job that cannot be found.
+  line("job A", Buffer.from(jobA).toString("hex"));
+  line("job B", Buffer.from(jobB).toString("hex"));
   console.log();
 }
 

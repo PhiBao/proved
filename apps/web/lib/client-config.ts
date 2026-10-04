@@ -17,6 +17,16 @@
 export interface ProvedContract {
   [method: string]: unknown;
   decimals(opts: { publicKey: string }): Promise<{ result: number }>;
+  stake_bps(
+    args: { freelancer: string },
+    opts: { publicKey: string },
+  ): Promise<{ result: string }>;
+  token(opts: { publicKey: string }): Promise<{ result: string }>;
+  attestation(
+    args: { id: Uint8Array },
+    opts: { publicKey: string },
+  ): Promise<{ result: [string, string, boolean, number] | null }>;
+  state(args: { id: Uint8Array }, opts: { publicKey: string }): Promise<{ result: number }>;
   challenge_bond_for(
     args: { amount: string | bigint },
     opts: { publicKey: string },
@@ -44,6 +54,14 @@ export interface ClientConfig {
   explorerTxBase: string;
   explorerAccountBase: string;
   explorerContractBase: string;
+  /**
+   * Why this network could not be configured, when it could not.
+   *
+   * Present so a deployment missing the mainnet RPC or USDC variables still
+   * builds and can explain itself, instead of failing at build time or rendering
+   * a network switcher whose mainnet option silently does nothing.
+   */
+  unconfigured?: string;
 }
 
 export const explorerTx = (cfg: ClientConfig, hash: string) => cfg.explorerTxBase + hash;

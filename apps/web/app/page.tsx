@@ -1,28 +1,8 @@
 import Link from "next/link";
-import { contractId, networkConfig, networkFromEnv, read } from "@/lib/proved";
+import { JobIdField } from "@/components/JobIdField";
+import { ContractFacts } from "@/components/ContractFacts";
 
-export const dynamic = "force-dynamic";
-
-async function liveFacts() {
-  const n = networkFromEnv();
-  try {
-    const [bps, token] = await Promise.all([
-      read<string>(n, "stake_bps", {
-        freelancer: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-      }),
-      read<string>(n, "token"),
-    ]);
-    return { bps, token, ok: true as const };
-  } catch {
-    return { ok: false as const };
-  }
-}
-
-export default async function Home() {
-  const n = networkFromEnv();
-  const net = networkConfig(n);
-  const facts = await liveFacts();
-
+export default function Home() {
   return (
     <div className="space-y-10">
       {/* ---------------------------------------------------------- hook -- */}
@@ -99,23 +79,12 @@ export default async function Home() {
           </Link>
         </div>
         <form action="/proof" className="card flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label className="label mb-1.5 block" htmlFor="jid">
-              Already have a job id? Look up its proof
-            </label>
-            <input
-              id="jid"
-              name="id"
-              required
-              placeholder="hex job id"
-              className="mono h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
-              style={{ borderColor: "var(--line)" }}
-            />
-          </div>
-          <button type="submit" className="btn btn-ghost">
-            Open proof
-          </button>
+          <JobIdField label="Already have a job id? Look up its proof" />
         </form>
+        <p className="text-[13px]" style={{ color: "var(--ink-soft)" }}>
+          Pre-filled with a job that has actually settled, so you can press the button without
+          inventing a 64-character hash. Paste over it to look up your own.
+        </p>
       </section>
 
       {/* ---------------------------------------------------------- proof -- */}
@@ -127,35 +96,7 @@ export default async function Home() {
           <span className="mono">Open</span>, and no other entry point moves funds out of a released
           job. There is no admin key and no upgrade path.
         </p>
-        <div className="mono mt-3 space-y-1 text-[13px]" style={{ color: "var(--ink-soft)" }}>
-          {facts.ok ? (
-            <>
-              <p>
-                stake for an unknown freelancer: <span style={{ color: "var(--ink)" }}>{facts.bps} bps</span> (3.00%)
-              </p>
-              <p>
-                settlement asset: <span style={{ color: "var(--ink)" }}>{facts.token.slice(0, 10)}…</span>
-              </p>
-            </>
-          ) : (
-            <p>contract not reachable — set the environment variables in apps/web/.env.local</p>
-          )}
-          <p>
-            deployment:{" "}
-            <a
-              className="link"
-              href={
-                process.env[`NEXT_PUBLIC_CONTRACT_${n.toUpperCase()}`]
-                  ? net.explorerContract(process.env[`NEXT_PUBLIC_CONTRACT_${n.toUpperCase()}`]!)
-                  : "#"
-              }
-              target="_blank"
-              rel="noreferrer"
-            >
-              {contractId(n).slice(0, 12)}…
-            </a>
-          </p>
-        </div>
+        <ContractFacts />
       </section>
     </div>
   );

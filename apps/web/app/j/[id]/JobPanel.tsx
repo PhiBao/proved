@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import type { JobState, Wallet } from "@/lib/proved";
+import { useNetwork } from "@/lib/network-context";
 import {
   explorerTx,
   getClientFor,
@@ -36,14 +37,12 @@ type Job = {
 interface Props {
   jobId: string;
   role: "client" | "freelancer";
-  initial: {
-    job: Job | null;
-    state: JobState;
-    decimals: number;
-    /** What a dispute costs, read server-side. */
-    bondMinimum: string | null;
-  };
-  config: ClientConfig;
+  /**
+   * Both networks. The panel resolves which one it is on from the context, so
+   * switching networks in the header re-reads the job rather than showing the
+   * previous network's answer — which matters because job ids are per-network.
+   */
+  configs: Record<string, ClientConfig>;
 }
 
 const STATUS: Record<JobState, { label: string; cls: string }> = {
@@ -64,10 +63,11 @@ declare global {
   }
 }
 
-export default function JobPanel({ jobId, role, initial, config: net }: Props) {
-  const [job, setJob] = useState<Job | null>(initial.job);
-  const [state, setState] = useState<JobState>(initial.state);
-  const [decimals, setDecimals] = useState(initial.decimals);
+export default function JobPanel({ jobId, role, configs }: Props) {
+  const { network, config: net } = useNetwork();
+  const [job, setJob] = useState<Job | null>(null);
+  const [state, setState] = useState<JobState>(0);
+  const [decimals, setDecimals] = useState(7);
   const [address, setAddress] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
@@ -75,18 +75,30 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
 
   /** Poll chain state, so the screen is never stale and never trusts the server. */
   const refresh = useCallback(async () => {
+    if (!net.contractId) return;
     try {
       const c = await getClientFor(net);
-      const [j, s] = await Promise.all([
+      const [j, s, d] = await Promise.all([
         c.job({ id: jobIdArg(jobId) }, { publicKey: READ_AS }),
         c.state({ id: jobIdArg(jobId) }, { publicKey: READ_AS }),
+        c.decimals({ publicKey: READ_AS }),
       ]);
       setJob((j.result as Job | null) ?? null);
       setState(s.result as JobState);
+      setDecimals(Number(d.result));
     } catch {
       /* leave the last known state on screen */
     }
   }, [jobId, net]);
+
+  // A job id belongs to one network, so switching must clear rather than keep
+  // showing the other network's answer for a frame.
+  useEffect(() => {
+    setJob(null);
+    setState(0);
+    setTxHash(null);
+    setNote(null);
+  }, [network]);
 
   useEffect(() => {
     const t = setInterval(refresh, 4000);
@@ -155,8 +167,11 @@ export default function JobPanel({ jobId, role, initial, config: net }: Props) {
   // dispute costs, so it must show the minimum the contract would demand, which
   // is the number the whole product turns on. Hooks must sit above the early
   // return below, or they are skipped on the first render.
-  const [bondNow, setBondNow] = useState<string | null>(initial.bondMinimum);
+  // Null until quoted on chain. A pre-dispute job records 0, which would render
+  // the card as "0.00" — the number that was wrong in an earlier version.
+  const [bondNow, setBondNow] = useState<string | null>(null);
   useEffect(() => {
+    setBondNow(null);
     if (!job) return;
     const recorded = BigInt(job.challenge_bond);
     if (recorded > 0n) {

@@ -1,0 +1,27 @@
+flowchart TD
+  %% The lifecycle, and the one thing that cannot happen.
+  %% Kept as a checked source file rather than drawn by hand, and rendered to
+  %% SVG at build time, so the diagram and the code cannot drift apart silently.
+
+  P["Payer<br/><i>browser</i>"] -->|"1. commits to sha256(file)<br/>and funds"| O
+  F["Freelancer<br/><i>browser</i>"] -->|"2. authorises<br/>their stake"| O
+
+  subgraph CHAIN["Soroban contract · no admin key · no upgrade path"]
+    O["open()<br/><b>Open</b>"] -->|"3. deliver a file"| S{"submit()<br/>artifact == commitment?"}
+    S -->|"match — releases in<br/>the same transaction"| R["<b>Released</b><br/><i>terminal, irreversible</i>"]
+    S -->|"no match — money stays put"| O
+    O -->|"4. contest, bonding<br/>15 bps of the amount"| C["challenge()<br/><b>Challenged</b>"]
+    C -->|"5. contract compares<br/>and settles"| D["confirm()<br/><b>Settled</b><br/><i>terminal</i>"]
+    O -->|"6. deadline passes,<br/>nothing delivered"| E["expire()<br/><i>refund</i>"]
+  end
+
+  R -.->|"challenge · re-submit · sweep · re-open<br/><b>all refused</b>"| X["✕ no path back<br/><i>enforced in one line,<br/>proven by a test</i>"]
+  D -.->|"same four routes<br/><b>all refused</b>"| X
+
+  CHAIN -->|"attestation() — derived<br/>from chain state alone"| W["/proof/&#91;id&#93;<br/><i>no login, no server,<br/>nothing to trust</i>"]
+  CHAIN -->|"counters owned by the account"| REP["reputation()<br/><i>sets tomorrow's stake:<br/>300 → 150 → 27 bps</i>"]
+
+  classDef terminal fill:#e6f2ec,stroke:#146b4f,stroke-width:2px,color:#16130f
+  classDef refused fill:#fdf0e8,stroke:#9a3412,stroke-width:2px,color:#16130f
+  class R,D terminal
+  class X refused

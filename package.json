@@ -4,7 +4,7 @@
   "packageManager": "pnpm@11.1.1",
   "version": "0.1.0",
   "type": "module",
-  "description": "Proved \u2014 paid on proof. Symmetric verifiable settlement for cross-border service work.",
+  "description": "Proved — paid on proof. Symmetric verifiable settlement for cross-border service work.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,6 +17,9 @@
     "build:contract": "cd contracts/proved && stellar contract build",
     "test:contract": "cd contracts/proved && cargo test",
     "audit": "./scripts/audit.sh",
+    "abi": "node --env-file-if-exists=.env.local scripts/abi.mjs",
+    "diagram": "node scripts/diagram.mjs",
+    "diagram:check": "node scripts/diagram.mjs --check",
     "deploy:testnet": "node --env-file-if-exists=.env.local scripts/deploy.mjs --network testnet",
     "deploy:mainnet": "node --env-file-if-exists=.env.local scripts/deploy.mjs --network mainnet",
     "demo:testnet": "node --env-file-if-exists=.env.local scripts/demo.mjs --network testnet",
@@ -28,9 +31,13 @@
     "sync-env": "node --env-file-if-exists=.env.local scripts/sync-env.mjs",
     "dev": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
-    "check": "pnpm run build:contract && pnpm run test:contract && pnpm run audit && pnpm run build:web"
+    "check": "pnpm run build:contract && pnpm run test:contract && pnpm run audit && pnpm run diagram:check && pnpm run build:web"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^17.2.1"
+  },
+  "devDependencies": {
+    "mermaid": "^12.1.0",
+    "playwright": "^1.63.0"
   }
 }

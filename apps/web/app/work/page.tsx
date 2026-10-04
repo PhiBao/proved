@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { JobIdField } from "@/components/JobIdField";
 
 export const dynamic = "force-dynamic";
 
@@ -22,22 +23,11 @@ export default async function Work({
           with no window in which they can change their mind.
         </p>
         <form action="/work" className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label className="label mb-1.5 block" htmlFor="wid">
-              Job id
-            </label>
-            <input
-              id="wid"
-              name="id"
-              required
-              placeholder="hex job id from your link"
-              className="mono h-[44px] w-full rounded-lg border bg-transparent px-3 text-sm outline-none focus:ring-2"
-              style={{ borderColor: "var(--line)" }}
-            />
-          </div>
-          <button type="submit" className="btn btn-ghost">
-            Open job
-          </button>
+          <JobIdField
+            id="wid"
+            label="Job id from your link"
+            submitLabel="Open job"
+          />
         </form>
       </div>
 

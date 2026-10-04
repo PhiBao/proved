@@ -14,14 +14,10 @@
  * named" is literal, and there is no server in the middle to be trusted.
  */
 import { useState } from "react";
+import { useNetwork } from "@/lib/network-context";
 
-export function PostJobForm({
-  network,
-  contractId,
-}: {
-  network: string;
-  contractId: string;
-}) {
+export function PostJobForm() {
+  const { network, config } = useNetwork();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [digest, setDigest] = useState<string | null>(null);
@@ -174,9 +170,12 @@ export function PostJobForm({
             is reproducible without installing a wallet. Nothing here has value.
           </>
         ) : (
-          <>Mainnet: the demo custodian is disabled. Connect a wallet to fund for real.</>
+          <>
+            Mainnet: the demo custodian is deliberately disabled, so this button cannot fund for
+            real. The contract is live — see the job page with a wallet connected.
+          </>
         )}{" "}
-        <span className="mono">{contractId.slice(0, 10)}…</span>
+        <span className="mono">{config.contractId ? `${config.contractId.slice(0, 10)}…` : "—"}</span>
       </p>
     </form>
   );

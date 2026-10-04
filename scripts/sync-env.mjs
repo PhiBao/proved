@@ -33,6 +33,15 @@ const lines = [
   `NEXT_PUBLIC_RPC_MAINNET=${NETWORKS.mainnet.rpcUrl}`,
   "",
   "# Settlement asset",
+  // A job that has actually settled on testnet, pre-filled into the site's job
+  // field. Replaced by hand when a newer job is settled; the point is that the
+  // id a judge lands on resolves to a real released payment.
+  `NEXT_PUBLIC_SHOWCASE_JOB_TESTNET=41c43d954bf7330cb849437f6a5c92f7d763eb24882f64078e8a30ac2dab0382`,
+  `NEXT_PUBLIC_SHOWCASE_JOB_DISPUTED_TESTNET=670e65eedd7abc05bf1356e58ef987aff6f1c035a85af014ec7b6576939d74a9`,
+  // Mainnet has no funded job: deploying needs ~24 XLM and four funded accounts
+  // to move real USDC. Empty, and the switcher says so rather than pre-filling
+  // an id that does not exist.
+  `NEXT_PUBLIC_SHOWCASE_JOB_MAINNET=`,
   `NEXT_PUBLIC_ASSET_CODE_TESTNET=${t.assetCode ?? "PUSD"}`,
   `NEXT_PUBLIC_ASSET_CONTRACT_TESTNET=${t.asset ?? ""}`,
   `NEXT_PUBLIC_USDC_MAINNET=${m.asset || NETWORKS.mainnet.usdc}`,
