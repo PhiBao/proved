@@ -11,11 +11,12 @@ https://github.com/PhiBao/proved
 ## Video pitch (required, 3 min max)
 https://github.com/PhiBao/proved/releases/download/v0.1/proved-pitch.mp4
 
-2:51 · 1440×810 · H.264 · silent, burned-in captions. Regenerate with
+2:43 · 1440×810 · H.264 · silent, burned-in captions. The file is
+`artifacts/proved-pitch.mp4` in the repo. Regenerate with
 `node scripts/pitch/shots.mjs && node scripts/pitch/build.mjs`.
 
 ## Other links (optional)
-- Live app: https://proved-kiters-projects-e9e82f9c.vercel.app
+- Live app: https://proved-diamond.vercel.app
 - Contract: https://stellar.expert/explorer/mainnet/contract/CAUDYRMNZQ4ROOVNSEMJZQKHI5AYGUUAMRVWB27CTEKLOLEFWK3A3GNJ
 - Demo run: `pnpm run demo:testnet` — prints real hashes for both paths and the clawback attempt
 - Read the contract's guarantees back: `pnpm run verify`
@@ -62,9 +63,11 @@ specific — this is usually a judging criterion."*
 > settling in Circle's USDC. `pnpm run verify -- --network mainnet` asks the deployed
 > contract what a dispute costs and gets $1.80 on a $1,200 job back from mainnet
 > contract code. 34 contract tests (23 correctness, 11 adversarial), 0 known
-> dependency vulnerabilities, a reproducible build whose hash CI checks against the
-> mainnet deployment on every push. Unaudited by a human — that is stated, not
-> hidden.
+> dependency vulnerabilities, a reproducible build (two clean builds byte-identical,
+> checked by CI on every push) whose exported interface is identical to the mainnet
+> deployment (`pnpm run abi`). The deployed executable hash predates the toolchain
+> pin and is reported, not hidden — see the README. Unaudited by a human — that is
+> stated, not hidden.
 >
 > **What we do not claim.** The contract sees a hash, never the content: it proves
 > identity, not quality, which is why the dispute path exists. The $1 bond floor
